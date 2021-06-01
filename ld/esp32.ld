@@ -17,12 +17,15 @@ SECTIONS {
   .vectors  : { KEEP(*(.vectors))   } > iram
   .text     : { *(.text*) *(.text)  } > iram
 
-  . = ALIGN(4);
-  _sidata = .;
-  .data : AT(_sidata) {
+  .data : {
+    . = ALIGN(4);
     _sdata = .;
-    *(.data+)
-    *(.rodata) *(.rodata*)
+    *(.data)
+    *(.data*)
+    *(.rodata)
+    *(.rodata*)
+    *(.gnu.linkonce.r.*)
+    *(.rodata1)
     . = ALIGN(4);
     _edata = .;
   } > dram
@@ -30,7 +33,8 @@ SECTIONS {
   .bss : {
     . = ALIGN(4);
     _sbss = .;
-    *(.bss) *(.bss*)
+    *(.bss)
+    *(.bss*)
     *(COMMON)
     . = ALIGN(4);
     _ebss = .;
@@ -39,6 +43,10 @@ SECTIONS {
   . = ALIGN(4);
   PROVIDE(end = .);
   PROVIDE(_end = .);
+
+  /*
+  /DISCARD/ : { *(.debug) *(.debug*) *(.xtensa.*) *(.comment) }
+  */
 }
 
 /* See .ld files in $IDF_PATH/components/esp_rom */
