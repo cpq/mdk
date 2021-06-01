@@ -1,6 +1,8 @@
 # ESP32 SDK
 
 This is an alternative, make-based, bare metal SDK for the ESP32 chip.
+Main source of inspiration is ESP32 TRM:
+[esp32_technical_reference_manual_en.pdf](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)
 
 # Environment setup
 
