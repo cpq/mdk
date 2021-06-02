@@ -1,13 +1,12 @@
 #pragma once
 
 #include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
+#include <stdlib.h>  // Don't #include toolchain's stdlib.h, use our malloc
 #include <string.h>
 
-
 #define BIT(x) (1UL << (x))
-#define REG(x) ((volatile uint32_t *) (x))
+#define REG(x) ((volatile unsigned long *) (x))
+
 #define RTC_CNTL_WDTCONFIG0_REG REG(0X3ff4808c)
 #define TIMG0_T0_WDTCONFIG0_REG REG(0X3ff5f048)
 #define DPORT_PRO_CACHE_CTRL1_REG REG(0x3ff00044)
@@ -25,8 +24,10 @@ static inline void gpio_toggle(int pin) {
 }
 
 static inline void spin(volatile unsigned long count) {
-  while (count) count--;
+  while (count--) asm volatile("nop");
 }
 
 void sdk_log(char *fmt, ...);
 void sdk_vlog(char *fmt, va_list);
+int sdk_ram_used(void);
+int sdk_ram_free(void);

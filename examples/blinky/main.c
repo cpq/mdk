@@ -9,7 +9,7 @@ int main(void) {
 
   gpio_output(led_pin);
   for (;;) {
-    sdk_log("%s\n", "hi");  // Print something to the serial console
+    sdk_log("Free RAM1: %d\n", sdk_ram_free());
     gpio_toggle(led_pin);   // Blink an LED
     spin(2999999);          // Delay a bit
   }

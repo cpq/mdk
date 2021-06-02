@@ -7,8 +7,15 @@ static void logc(int c) {
   uart_tx_one_char((unsigned char) c);
 }
 
-static void logh(unsigned char c) {
-  logc(c < 9 ? c + '0' : c + 'a');
+static void logx(unsigned long v) {
+  unsigned bits = sizeof(v) * 8, show = 0;
+  while (bits) {
+    bits -= 4;
+    unsigned char c = (v >> bits) & 15;
+    if (show == 0 && c == 0) continue;
+    logc(c < 10 ? c + '0' : c + 'W');
+    show = 1;
+  }
 }
 
 static void logd(unsigned long v) {
@@ -43,17 +50,20 @@ void sdk_vlog(const char *fmt, va_list ap) {
       case 'u':
         logd((unsigned long) va_arg(ap, unsigned));
         break;
+      case 'p':
+        logc('0');
+        logc('x');
+        logx((unsigned long) va_arg(ap, void *));
+        break;
       case 'd': {
         int v = va_arg(ap, int);
         if (v < 0) v = -v, logc('-');
         logd((unsigned long) v);
         break;
       }
-      case 'x': {
-        unsigned u = va_arg(ap, unsigned), bits = sizeof(u) * 8;
-        while (bits) bits -= 4, logh((u >> bits) & 15);
+      case 'x':
+        logx(va_arg(ap, unsigned long));
         break;
-      }
       case 0:
         return;
       default:

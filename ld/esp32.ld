@@ -3,14 +3,21 @@ MEMORY {
   drom   (rw)   : ORIGIN = 0X3ff90000, LENGTH = 64k
   irom   (rwx)  : ORIGIN = 0x40000000, LENGTH = 384k
 
+  cache0 (rwx)  : ORIGIN = 0x40070000, LENGTH = 32k
+  cache1 (rwx)  : ORIGIN = 0x40078000, LENGTH = 32k
   iram   (rwx)  : ORIGIN = 0x40080000, LENGTH = 128k
+  /* Last 64k of DRAM, right after the ROM bootloader stack */
+  dram   (rw)   : ORIGIN = 0x3fff0000, LENGTH = 64k
+  /*
   dram   (rw)   : ORIGIN = 0x3ffae000, LENGTH = 328k
+  */
 
   dflash (rw)   : ORIGIN = 0X3f400000, LENGTH = 1024k
   psram  (rw)   : ORIGIN = 0X3f800000, LENGTH = 1024k
   iflash (rwx)  : ORIGIN = 0X400c2000, LENGTH = 11512k
 }
 
+_eram = ORIGIN(dram) + LENGTH(dram);
 ENTRY(_reset)
 
 SECTIONS {
@@ -52,14 +59,3 @@ SECTIONS {
 /* See .ld files in $IDF_PATH/components/esp_rom */
 PROVIDE(uart_rx_one_char = 0x400092d0);
 PROVIDE(uart_tx_one_char = 0x40009200);
-
-PROVIDE(vsnprintf = 0x40056a68);
-PROVIDE(snprintf = 0x40056b4c);
-PROVIDE(strcpy = 0x400013ac);
-PROVIDE(strlen = 0x400014c0);
-PROVIDE(memchr = 0x4000c244);
-PROVIDE(memcmp = 0x4000c260);
-PROVIDE(memcpy = 0x4000c2c8);
-PROVIDE(memmove = 0x4000c3c0);
-PROVIDE(memrchr = 0x4000c400);
-PROVIDE(memset = 0x4000c44c);

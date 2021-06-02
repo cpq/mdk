@@ -1,7 +1,7 @@
 PROG      ?= firmware
 ROOT_PATH ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 ARCH      ?= esp32
-OBJ_PATH  = obj
+OBJ_PATH  = ./obj
 PORT      ?= /dev/ttyUSB0
 ESPTOOL   ?= esptool.py
 TOOLCHAIN ?= xtensa-esp32-elf
@@ -21,7 +21,7 @@ INCLUDES  += -I. -I$(ROOT_PATH)/include
 WARNFLAGS += -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
 OPTFLAGS  += -Os -g3 -ffunction-sections -fdata-sections
 CFLAGS    += $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES)
-LINKFLAGS += $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld -Wl,--gc-sections -nostdlib
+LINKFLAGS += $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld --gc-sections -nostdlib -nodefaultlibs
 
 SOURCES += $(ROOT_PATH)/boot/syscalls.c
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
@@ -38,7 +38,7 @@ $(OBJ_PATH)/boot.o: $(ROOT_PATH)/boot/boot_$(ARCH).s
 	$(TOOLCHAIN)-as -g --warn --fatal-warnings $(MCUFLAGS) $< -o $@
 
 $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
-	$(TOOLCHAIN)-gcc $(OBJECTS) $(LINKFLAGS) -o $@
+	$(TOOLCHAIN)-ld $(OBJECTS) $(LINKFLAGS) -o $@ 
 	$(TOOLCHAIN)-size $@
 
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
