@@ -34,9 +34,8 @@ $ make -C examples/blinky clean build flash
 - Do a proper peripheral setup - enable WiFi radio
 - Pull in cnip and attach to the WiFi radio IO
 - Implement malloc/free that uses several memory regions - use all RAM we could
+  For example, an unused CPU1 cache in IRAM
 - Implement simple task switching (RTOS), to prevent busy loops resetting us
-- `src/log.c :: sdk_log` is broken. It can print only plain strings.
-  If a proper formatted arg is passed, chip resets. Figure out and fix
 - Don't bother enabling 2nd core, C3 does not have it anyway
 - Design and implement GPIO, SPI, I2C API
 
