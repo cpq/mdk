@@ -1,6 +1,6 @@
 #include <sdk.h>
 
-static int led_pin = 2;
+static int led_pin = LED1;  // To override: make CFLAGS_EXTRA=-DLED1=5
 
 int main(void) {
   wdt_disable();

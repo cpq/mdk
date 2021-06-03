@@ -34,8 +34,8 @@ void *sbrk(int diff) {
 }
 
 void __assert_func(const char *a, int b, const char *c, const char *d) {
-  gpio_output(2);
-  for (;;) spin(199999), gpio_toggle(2);
+  gpio_output(LED1);
+  for (;;) spin(199999), gpio_toggle(LED1);
   (void) a;
   (void) b;
   (void) c;
