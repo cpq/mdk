@@ -28,10 +28,7 @@ static void sdk_heap_init(void *start, void *end) {
 
 void *sbrk(int diff) {
   char *old = s_brk;
-  if (&s_brk[diff] > s_heap_end) {
-    // errno = ENOMEM;
-    return NULL;
-  }
+  if (&s_brk[diff] > s_heap_end) return NULL;
   s_brk += diff;
   return old;
 }
