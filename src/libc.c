@@ -45,6 +45,12 @@ void *memset(void *dest, int c, size_t n) {
   return dest;
 }
 
+void *memcpy(void *dst, const void *src, size_t len) {
+  unsigned char *d = dst, *s = (unsigned char *) src;
+  for (size_t i = 0; i < len; i++) d[i] = s[i];
+  return dst;
+}
+
 char *strcpy(char *dst, const char *src) {
   for (size_t i = 0; src[i] != '\0'; i++) dst[i] = src[i];
   return dst;

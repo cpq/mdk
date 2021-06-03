@@ -7,7 +7,7 @@
 #define GPIO_IN1_REG REG(0X3ff44040)               // Pins 32-39
 #define GPIO_ENABLE1_REG REG(0X3ff4402c)           // Pins 32-39
 
-static inline void gpio_output_enable(int pin, int enable) {
+static inline void gpio_output_enable(int pin, bool enable) {
   volatile unsigned long *r = GPIO_ENABLE_REG;
   if (pin > 31) pin -= 31, r = GPIO_ENABLE1_REG;
   r[0] &= ~BIT(pin);
@@ -19,7 +19,7 @@ static inline void gpio_output(int pin) {
   gpio_output_enable(pin, 1);
 }
 
-static inline void gpio_write(int pin, int value) {
+static inline void gpio_write(int pin, bool value) {
   volatile unsigned long *r = GPIO_OUT_REG;
   if (pin > 31) pin -= 31, r = GPIO_OUT1_REG;
   r[0] &= ~BIT(pin);               // Clear first
@@ -41,10 +41,10 @@ static inline void gpio_input(int pin) {
   volatile unsigned long *mux = REG(0X3ff49000);
   if (pin < 0 || pin > (int) sizeof(map) || map[pin] == 0) return;
   gpio_output_enable(pin, 0);  // Disable output
-  mux[pin] |= BIT(9);          // Enable input
+  mux[map[pin]] |= BIT(9);     // Enable input
 }
 
-static inline int gpio_read(int pin) {
+static inline bool gpio_read(int pin) {
   volatile unsigned long *r = GPIO_IN_REG;
   if (pin > 31) pin -= 31, r = GPIO_IN1_REG;
   return r[0] & BIT(pin) ? 1 : 0;
