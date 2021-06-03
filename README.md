@@ -54,3 +54,11 @@ $ make -C examples/blinky clean build flash
   on, from ROM. ROM's implementation uses newlib
 - We cannot use ROM's `malloc`, cause we don't know what memory regions
   it is going to use
+
+Partitions table used:
+```csv
+nvs,      data, nvs,     0x9000,    20K,
+app0,     app,  ota_0,   0x10000,   1280K,
+app1,     app,  ota_1,   ,          1280K,
+spiffs,   data, spiffs,  ,          1M,
+```

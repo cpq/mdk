@@ -1,9 +1,7 @@
-#include <assert.h>
 #include <sdk.h>
 
 extern int main(void);
 
-#if 1
 static char *s_heap_start;  // Heap start. Set up by sdk_heap_init()
 static char *s_heap_end;    // Heap end
 static char *s_brk;         // Current heap usage marker
@@ -37,7 +35,6 @@ void *sbrk(int diff) {
   s_brk += diff;
   return old;
 }
-#endif
 
 void __assert_func(const char *a, int b, const char *c, const char *d) {
   gpio_output(2);
@@ -55,16 +52,6 @@ void startup(void) {
 
   extern char _end, _eram;
   sdk_heap_init(&_end, &_eram);
-
-  extern char _sdata, _edata;
-  {
-    assert(&_sbss <= &_ebss);
-    assert(&_sdata <= &_edata);
-    char *sp = NULL;
-    asm volatile("mov %[v], sp;" : [v] "=r"(sp));
-    assert(sp < &_sbss);
-    assert(sp < &_sdata);
-  }
 
   main();
 }

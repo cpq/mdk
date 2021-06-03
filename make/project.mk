@@ -21,9 +21,8 @@ INCLUDES  += -I. -I$(ROOT_PATH)/include
 WARNFLAGS += -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
 OPTFLAGS  += -Os -g3 -ffunction-sections -fdata-sections
 CFLAGS    += $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES)
-LINKFLAGS += $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld --gc-sections -nostdlib -nodefaultlibs
+LINKFLAGS += $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld --gc-sections
 
-SOURCES += $(ROOT_PATH)/boot/syscalls.c
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
 OBJECTS = $(SOURCES:%.c=$(OBJ_PATH)/%.o) $(OBJ_PATH)/boot.o
 
@@ -45,7 +44,10 @@ $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 	$(ESPTOOL) --chip esp32 elf2image --flash_mode="dio" --flash_freq "40m" --flash_size "4MB" -o $@ $<
 
 flash: $(OBJ_PATH)/$(PROG).bin
-	$(ESPTOOL) --chip esp32 --port $(PORT) --baud 115200 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 $?
+	$(ESPTOOL) --chip esp32 --port $(PORT) --baud 115200 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
+    0x1000 $(ROOT_PATH)/boot/bootloader_$(ARCH).bin \
+    0x8000 $(ROOT_PATH)/boot/partitions.bin \
+    0x10000 $?
 
 clean:
 	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(OBJ_PATH)

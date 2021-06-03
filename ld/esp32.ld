@@ -5,12 +5,8 @@ MEMORY {
 
   cache0 (rwx)  : ORIGIN = 0x40070000, LENGTH = 32k
   cache1 (rwx)  : ORIGIN = 0x40078000, LENGTH = 32k
-  iram   (rwx)  : ORIGIN = 0x40080000, LENGTH = 128k
-  /* Last 64k of DRAM, right after the ROM bootloader stack */
-  dram   (rw)   : ORIGIN = 0x3fff0000, LENGTH = 64k
-  /*
-  dram   (rw)   : ORIGIN = 0x3ffae000, LENGTH = 328k
-  */
+  iram   (rwx)  : ORIGIN = 0x40080400, LENGTH = 127k  /* First 1k is vectors */
+  dram   (rw)   : ORIGIN = 0x3ffb0000, LENGTH = 320k
 
   dflash (rw)   : ORIGIN = 0X3f400000, LENGTH = 1024k
   psram  (rw)   : ORIGIN = 0X3f800000, LENGTH = 1024k
@@ -21,7 +17,7 @@ _eram = ORIGIN(dram) + LENGTH(dram);
 ENTRY(_reset)
 
 SECTIONS {
-  .vectors  : { KEEP(*(.vectors))   } > iram
+  /* .vectors  : { KEEP(*(.vectors))   } > iram */
   .text     : { *(.text*) *(.text)  } > iram
 
   .data : {

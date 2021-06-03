@@ -1,7 +1,8 @@
 #pragma once
 
+#include <assert.h>
 #include <stdarg.h>
-#include <stdlib.h>  // Don't #include toolchain's stdlib.h, use our malloc
+#include <stdlib.h>
 #include <string.h>
 
 #define BIT(x) (1UL << (x))

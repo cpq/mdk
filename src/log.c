@@ -16,6 +16,7 @@ static void logx(unsigned long v) {
     logc(c < 10 ? c + '0' : c + 'W');
     show = 1;
   }
+  if (show == 0) logc('0');
 }
 
 static void logd(unsigned long v) {
