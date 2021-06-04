@@ -3,7 +3,15 @@
 
 #include <cnip.h>
 
+#if 1
+#include <sdk.h>
+#define DEBUG(fmt, ...) sdk_log(fmt, __VA_ARGS__)
+#else
+#define DEBUG(fmt, ...)
+#endif
+
 void cn_mac_in(void *buf, size_t len) {
+  DEBUG("got frame %u bytes", len);
   (void) buf;
   (void) len;
 }

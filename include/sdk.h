@@ -18,8 +18,10 @@
 #define LED1 2  // Default LED pin
 #endif
 
+#include "cnip.h"
 #include "gpio.h"
 #include "spi.h"
+#include "uart.h"
 #include "wdt.h"
 
 static inline void spin(volatile unsigned long count) {

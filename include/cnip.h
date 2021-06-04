@@ -9,6 +9,7 @@
 void cn_mac_in(void *buf, size_t len);   // Implemented by CNIP
 void cn_mac_out(void *buf, size_t len);  // Must be implemented by user
 void cn_poll(unsigned long now_ms);      // Called periodically or on event
+extern unsigned char cn_mac_addr[6];     // Must be set by user
 
 // High level (user) API
 // This is a user-defined callback function that gets called on various events

@@ -1,63 +1,59 @@
 #include <sdk.h>
 
-static unsigned readn(struct spi *spi, uint8_t reg, int n) {
-  unsigned rx = 0;
-  spi_begin(spi, 0);
-  spi_txn(spi, reg | 0x80);
-  for (int i = 0; i < n; i++) rx <<= 8, rx |= spi_txn(spi, 0);
-  spi_end(spi, 0);
-  return rx;
+// Per https://datatracker.ietf.org/doc/html/rfc1055
+enum { END = 0300, ESC = 0333, ESC_END = 0334, ESC_ESC = 0335 };
+
+void cn_mac_out(void *buf, size_t len) {
+  uint8_t *p = buf;
+  uart_tx(END);
+  for (size_t i = 0; i < len; i++) {
+    if (p[i] == END) {
+      uart_tx(ESC);
+      uart_tx(ESC_END);
+    } else if (p[i] == ESC) {
+      uart_tx(ESC);
+      uart_tx(ESC_ESC);
+    } else {
+      uart_tx(p[i]);
+    }
+  }
+  uart_tx(END);
 }
 
-static void write8(struct spi *spi, uint8_t reg, uint8_t val) {
-  spi_begin(spi, 0);
-  spi_txn(spi, (uint8_t)(reg & ~0x80));
-  spi_txn(spi, val);
-  spi_end(spi, 0);
-}
-
-uint16_t swap16(uint16_t val) {
-  uint8_t data[2] = {0, 0};
-  memcpy(&data, &val, sizeof(data));
-  return (uint16_t)((uint16_t) data[1] | (((uint16_t) data[0]) << 8));
-}
-
-// Taken from the BME280 datasheet, 4.2.3
-int32_t read_temp(struct spi *spi) {
-  int32_t t = (int32_t)(readn(spi, 0xfa, 3) >> 4);  // Read temperature reg
-
-  uint16_t c1 = (uint16_t) readn(spi, 0x88, 2);  // dig_T1
-  uint16_t c2 = (uint16_t) readn(spi, 0x8a, 2);  // dig_T2
-  uint16_t c3 = (uint16_t) readn(spi, 0x8c, 2);  // dig_T3
-
-  int32_t t1 = (int32_t) swap16(c1);
-  int32_t t2 = (int32_t)(int16_t) swap16(c2);
-  int32_t t3 = (int32_t)(int16_t) swap16(c3);
-
-  int32_t var1 = ((((t >> 3) - (t1 << 1))) * t2) >> 11;
-  int32_t var2 = (((((t >> 4) - t1) * ((t >> 4) - t1)) >> 12) * t3) >> 14;
-
-  return ((var1 + var2) * 5 + 128) >> 8;
-}
+// We could fill it up with a real device's MAC
+unsigned char cn_mac_addr[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
 
 int main(void) {
-  wdt_disable();
+  wdt_disable();  // Shut up our friend for now
 
-  struct spi bme280 = {.mosi = 23, .miso = 19, .clk = 18, .cs = {5, -1, -1}};
-  spi_init(&bme280);
+  size_t len = 0, size = 1600;  // Serial input length, and max frame size
+  uint8_t *buf = malloc(size);  // Allocate serial input buffer
 
-  write8(&bme280, 0xe0, 0xb6);          // Soft reset
-  spin(999999);                         // Wait until reset
-  write8(&bme280, 0xf4, 0);             // REG_CONTROL, MODE_SLEEP
-  write8(&bme280, 0xf5, (3 << 5));      // REG_CONFIG, filter = off, 20ms
-  write8(&bme280, 0xf4, (1 << 5) | 3);  // REG_CONFIG, MODE_NORMAL
+  bool buffering = false;       // True when we're buffering IP packet
+  unsigned long uptime_ms = 0;  // Pretend we know what time it is
 
   for (;;) {
-    sdk_log("Chip ID: %d, expecting 96\n", readn(&bme280, 0xd0, 1));
-    int temp = read_temp(&bme280);
-    sdk_log("Temp: %d.%d\n", temp / 100, temp % 100);
-    spin(9999999);
+    if (uart_rx(&buf[len]) == 0) {
+      if (buffering) {
+        if (len > 0 && buf[len] == ESC_END) {
+          buf[len - 1] = END;
+        } else if (len > 0 && buf[len] == ESC_ESC) {
+          buf[len - 1] = ESC;
+        } else if (buf[len] == END) {
+          cn_mac_in(buf, len);  // Full frame received, feed to the IP stack
+          len = 0;              // Flush input buffer
+          buffering = false;    // Stop buffering
+        } else {
+          len++;
+          if (len >= size) sdk_log("SLIP overflow\n"), len = 0;
+        }
+      } else if (buf[len] == END) {
+        buffering = true;  // Start buffering
+      }
+    }
+    cn_poll(uptime_ms++);  // Let IP stack process things
+    spin(99);              // Sleep for some time.. Or maybe don't?
   }
 
-  return 0;
+  return 0;  // Unreached
 }
