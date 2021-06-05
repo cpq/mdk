@@ -15,11 +15,11 @@ static char *s_brk;         // Current heap usage marker
 //      |      (used memory)       |    (free memory)     |
 
 int sdk_ram_used(void) {
-  return s_brk - s_heap_start;
+  return (int) (s_brk - s_heap_start);
 }
 
 int sdk_ram_free(void) {
-  return s_heap_end - s_brk;
+  return (int) (s_heap_end - s_brk);
 }
 
 static void sdk_heap_init(void *start, void *end) {
@@ -34,12 +34,9 @@ void *sbrk(int diff) {
 }
 
 void __assert_func(const char *a, int b, const char *c, const char *d) {
+  sdk_log("ASSERT %s %d %s %s\n", a, b, c, d);
   gpio_output(LED1);
   for (;;) spin(199999), gpio_toggle(LED1);
-  (void) a;
-  (void) b;
-  (void) c;
-  (void) d;
 }
 
 // Initialise memory and other low level stuff, and call main()
@@ -52,3 +49,22 @@ void startup(void) {
 
   main();
 }
+
+#if defined(__unix) || defined(__unix__) || defined(__APPLE__)
+char _sbss, _ebss, _end, _eram;
+int s_uart = -1;
+static void open_uart(void) {
+  s_uart = open("/dev/ptyp3", O_RDWR);
+}
+int uart_tx(uint8_t ch) {
+  if (s_uart < 0) open_uart();
+  return write(s_uart, &ch, 1) == 1 ? 0 : -1;
+}
+int uart_rx(uint8_t *ch) {
+  if (s_uart < 0) open_uart();
+  return read(s_uart, ch, 1) == 1 ? 0 : -1;
+}
+int uart_tx_one_char(uint8_t ch) {
+  return uart_tx(ch);
+}
+#endif

@@ -4,12 +4,17 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 // Low level (hardware) API
-void cn_mac_in(void *buf, size_t len);   // Implemented by CNIP
-void cn_mac_out(void *buf, size_t len);  // Must be implemented by user
-void cn_poll(unsigned long now_ms);      // Called periodically or on event
-extern unsigned char cn_mac_addr[6];     // Must be set by user
+struct cn_if {                        // CNIP network interface
+  const char *name;                   // For debugging
+  void (*out)(const void *, size_t);  // Frame sender function
+  uint8_t mac[6];                     // MAC address
+  uint32_t ip, mask, gw;              // Leave zeros to use DCHP
+};
+void cn_input(struct cn_if *, void *, size_t);  // Handle received frame
+void cn_poll(struct cn_if *, unsigned long);    // Call periodically
 
 // High level (user) API
 // This is a user-defined callback function that gets called on various events

@@ -12,21 +12,27 @@ TOOLCHAIN ?= xtensa-esp32-elf
 
 INCLUDES  ?= -I. -I$(ROOT_PATH)/include
 WARNFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
-OPTFLAGS  ?= -Os -g3 -ffunction-sections -fdata-sections
+OPTFLAGS  ?= -O3 -g3 -ffunction-sections -fdata-sections
 CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(CFLAGS_EXTRA)
 LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld --gc-sections
 
 ifeq "$(ARCH)" "c3"
-MCUFLAGS  += -march=rv32imc -mabi=ilp32
-WARNFLAGS += -Wformat-truncation
-else
-CFLAGS    += -mlongcalls -mtext-section-literals
+MCUFLAGS  ?= -march=rv32imc -mabi=ilp32
+WARNFLAGS ?= -Wformat-truncation
+else 
+MCUFLAGS  ?= -mlongcalls -mtext-section-literals
 endif
 
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
 OBJECTS = $(SOURCES:%.c=$(OBJ_PATH)/%.o) $(OBJ_PATH)/boot.o
 
 build: $(OBJ_PATH)/$(PROG).bin
+
+unix: MCUFLAGS =
+unix: OPTFLAGS = -O0 -g3
+unix: $(SOURCES)
+	@mkdir -p $(OBJ_PATH)
+	$(CC) $(CFLAGS) $(SOURCES) -o $(OBJ_PATH)/firmware
 
 $(OBJ_PATH)/%.o: %.c
 	@mkdir -p $(dir $@)

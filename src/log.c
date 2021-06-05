@@ -23,7 +23,7 @@ static void logd(unsigned long v) {
   unsigned long d = 1000000000;
   while (v < d) d /= 10;
   while (d > 1) {
-    unsigned m = v / d;
+    unsigned long m = v / d;
     v -= m * d;
     d /= 10;
     logc((unsigned char) (m + '0'));
