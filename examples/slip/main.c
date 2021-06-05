@@ -26,10 +26,7 @@ int main(void) {
   size_t len = 0, size = 1600;  // Serial input length, and max frame size
   uint8_t *buf = malloc(size);  // Allocate serial input buffer
 
-  struct cn_if netif = {.name = "slip",
-                        .out = send_frame,
-                        .mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66}};
-
+  struct cn_if netif = {.out = send_frame, .mac = {1, 2, 3, 4, 5, 6}};
   bool got_ipaddr = false;
   bool buffering = false;       // True when we're buffering IP packet
   unsigned long uptime_ms = 0;  // Pretend we know what time it is

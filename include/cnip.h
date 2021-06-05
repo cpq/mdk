@@ -8,7 +8,6 @@
 
 // Low level (hardware) API
 struct cn_if {                        // CNIP network interface
-  const char *name;                   // For debugging
   void (*out)(const void *, size_t);  // Frame sender function
   uint8_t mac[6];                     // MAC address
   uint32_t ip, mask, gw;              // Leave zeros to use DCHP
