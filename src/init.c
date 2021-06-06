@@ -54,7 +54,8 @@ void startup(void) {
 char _sbss, _ebss, _end, _eram;
 int s_uart = -1;
 static void open_uart(void) {
-  s_uart = open("/dev/ptyp3", O_RDWR);
+  s_uart = open("/dev/ptyp17", O_RDWR | O_NOCTTY | O_SYNC);
+  // set_interface_attribs(s_uart, 115200);
 }
 int uart_tx(uint8_t ch) {
   if (s_uart < 0) open_uart();

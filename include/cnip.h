@@ -7,31 +7,26 @@
 #include <stdint.h>
 
 // Low level (hardware) API
-struct cn_if {                        // CNIP network interface
+struct cnip_if {
   void (*out)(const void *, size_t);  // Frame sender function
   uint8_t mac[6];                     // MAC address
+  size_t mtu;                         // Max frame size
   uint32_t ip, mask, gw;              // Leave zeros to use DCHP
 };
-void cn_input(struct cn_if *, void *, size_t);  // Handle received frame
-void cn_poll(struct cn_if *, unsigned long);    // Call periodically
+void cnip_input(struct cnip_if *, void *, size_t);  // Handle received frame
+void cnip_poll(struct cnip_if *, unsigned long);    // Call periodically
 
 // High level (user) API
-// This is a user-defined callback function that gets called on various events
-struct cn_conn;                                     // A connection - opaque
-typedef void (*cn_fn_t)(struct cn_conn *, int ev);  // User function
-enum {
-  CN_EV_ERROR,    // Error! Use cn_get_error() to get the reason
-  CN_EV_CONNECT,  // Client connection established
-  CN_EV_ACCEPT,   // New server connection accepted
-  CN_EV_READ,     // More data arrived, use cn_rx() to access data
-  CN_EV_WRITE,    // Data has been sent to the network
-  CN_EV_CLOSE,    // Connection is about to vanish
-};
-// API for creating new connections
-struct cn_conn *cn_tcp_listen(const char *url, cn_fn_t handler_fn);
-struct cn_conn *cn_tcp_connect(const char *url, cn_fn_t handler_fn);
-// API for use from inside a user callback function
-void cn_rx(struct cn_conn *, void **buf, size_t *len);   // Get recv data
-void cn_tx(struct cn_conn *, void **buf, size_t *len);   // Get sent data
-void cn_send(struct cn_conn *, void *buf, size_t len);   // Send more data
-void cn_free(struct cn_conn *, size_t off, size_t len);  // Discard recv data
+struct cnip_conn;  // A network connection
+typedef void (*cnip_fn_t)(struct cnip_conn *, int ev, void *ev_data);
+
+#define CNIP_EV_ERROR 1    // Error            ev_data: const char *err_str
+#define CNIP_EV_CONNECT 2  // Connected to peer         NULL
+#define CNIP_EV_ACCEPT 3   // New connection accepted   NULL
+#define CNIP_EV_READ 4     // Data received             void **[buf, len]
+#define CNIP_EV_CLOSE 5    // Connection is closing     NULL
+#define CNIP_EV_POLL 6     // Periodic poll             NULL
+
+struct cnip_conn *cnip_listen_tcp(const char *url, cnip_fn_t fn);
+struct cnip_conn *cnip_connect_tcp(const char *url, cnip_fn_t fn);
+void cnip_send(struct cnip_conn *, void *buf, size_t len);

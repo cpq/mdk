@@ -23,15 +23,17 @@ static void send_frame(const void *buf, size_t len) {
 int main(void) {
   wdt_disable();  // Shut up our friend for now
 
-  size_t len = 0, size = 1600;  // Serial input length, and max frame size
-  uint8_t *buf = malloc(size);  // Allocate serial input buffer
+  struct cnip_if netif = {
+      .out = send_frame, .mtu = 1600, .mac = {1, 2, 3, 4, 5, 6}};
 
-  struct cn_if netif = {.out = send_frame, .mac = {1, 2, 3, 4, 5, 6}};
+  size_t len = 0;                    // Serial input length
+  uint8_t *buf = malloc(netif.mtu);  // Allocate serial input buffer
+
   bool got_ipaddr = false;
   bool buffering = false;       // True when we're buffering IP packet
   unsigned long uptime_ms = 0;  // Pretend we know what time it is
 
-  sdk_log("Starting SLIP, max frame len %u\n", size);
+  sdk_log("Starting SLIP, max frame len %u\n", netif.mtu);
   for (;;) {
     if (uart_rx(&buf[len]) == 0) {
       if (buffering) {
@@ -40,18 +42,19 @@ int main(void) {
         } else if (len > 0 && buf[len] == ESC_ESC) {
           buf[len - 1] = ESC;
         } else if (buf[len] == END) {
-          cn_input(&netif, buf, len);  // Full frame received
+          cnip_input(&netif, buf, len);  // Full frame received
           len = 0;                     // Flush input buffer
           buffering = false;           // Stop buffering
         } else {
           len++;
-          if (len >= size) sdk_log("SLIP overflow\n"), len = 0;
+          if (len >= netif.mtu) sdk_log("SLIP overflow\n"), len = 0;
         }
       } else if (buf[len] == END) {
         buffering = true;  // Start buffering
       }
+      sdk_log("... n=%x\n", len);
     }
-    cn_poll(&netif, uptime_ms++);  // Let IP stack process things
+    cnip_poll(&netif, uptime_ms++);  // Let IP stack process things
     if (got_ipaddr == false && netif.ip != 0) {
       sdk_log("ip %x, mask %x, gw %x\n", netif.ip, netif.mask, netif.gw);
       got_ipaddr = true;
