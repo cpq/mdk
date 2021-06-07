@@ -43,6 +43,7 @@
 #define SLIP_ESC_END         0334    /* ESC ESC_END means END data byte */
 #define SLIP_ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
 
+#if 0
 int iSerialPort;
 int iRawSocket;
 pthread_t thdNetworkReceive;
@@ -118,6 +119,7 @@ void SignalHandler() {
   close(iSerialPort);
   close(iRawSocket);
 }
+#endif
 
 int main(int argc, char **argv) {
   char *selected_port = 0;
@@ -211,16 +213,14 @@ int main(int argc, char **argv) {
 
   // Parse options
   for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
+    if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
+      selected_baud = atoi(argv[++i]);
+    } else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
       selected_iface = argv[++i];
-    } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
-      filter = argv[++i];
     } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
       selected_port = argv[++i];
-    } else if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
-      selected_baud = atoi(argv[++i]);
     } else if (strcmp(argv[i], "-r") == 0) {
-      // selected_baud = atoi(argv[++i]);
+      printdetect = 2;
     } else {
       fprintf(stderr, "slipterm version " SLIPTERM_VERSION
                       " usage:\n"
@@ -234,6 +234,7 @@ int main(int argc, char **argv) {
     }
   }
 
+#if 0
   // Tricky: If the baud rate given was bad, abort.
   if (selected_baud == 0) {
     fprintf(stderr, "Error: invalid baud rate.\n");
@@ -291,8 +292,7 @@ int main(int argc, char **argv) {
   if (printdetect) {
     fprintf(stderr,
             "slipterm version " SLIPTERM_VERSION
-            " configuration:\n
-            "interface %s\nport %s\nbaud%d\n",
+            " configuration:\ninterface %s\nport %s\nbaud%d\n",
             selected_iface, selected_port, selected_baud);
 
     // If -r flag used, exit.
@@ -486,6 +486,7 @@ int main(int argc, char **argv) {
       }
     }
   }
+#endif
 
   return 0;
 }
