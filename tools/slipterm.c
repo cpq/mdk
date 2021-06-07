@@ -9,16 +9,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <pthread.h>
-#include <signal.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -122,105 +115,21 @@ void SignalHandler() {
 #endif
 
 int main(int argc, char **argv) {
-  char *selected_port = 0;
-  int selected_baud = 115200;
-  char *selected_iface = 0;
-  char printdetect = 1;
-
-#if 0
-  if (argc > 1) {
-    char **argvadvance = argv;
-    char printhelp = 0;
-
-    for (argvadvance = argv; argvadvance < (argv + argc); argvadvance++) {
-      char *av = *argvadvance;
-      char c;
-      while (c = *(av++)) {
-        char nextchar = *av;
-        char extended = 0;
-        switch (c) {
-          // Long parameters
-          case '-':
-            if (nextchar != '-') break;
-
-            // We have a long parameter, i.e. --port, --baud, --interface
-            if (strcmp((av + 1), "port") == 0) extended = 'p';
-            if (strcmp((av + 1), "baud") == 0) extended = 'b';
-            if (strcmp((av + 1), "interface") == 0) extended = 'i';
-
-            break;
-
-          // Parameters which take an additional parameter.
-          case 'i':
-          case 'b':
-          case 'p':
-            if (nextchar) {
-              printhelp = 1;
-              goto exit_parse_early;
-            } else {
-              extended = c;
-            }
-            break;
-
-          // Short parameters
-          case 'r':
-            printdetect = 2;
-            break;
-          case 'q':
-            printdetect = 0;
-            break;
-          case 'h':
-          default:
-            printhelp = 1;
-            goto exit_parse_early;
-            break;
-        }
-
-        if (extended) {
-          char *avnext =
-              ((argvadvance + 1) < (argv + argc)) ? *(argvadvance + 1) : 0;
-
-          switch (extended) {
-            case 'i':
-              selected_iface = avnext;
-              break;
-            case 'b':
-              selected_baud = atoi(avnext);
-              break;
-            case 'p':
-              selected_port = avnext;
-              break;
-          }
-        }
-      }
-    }
-
-  exit_parse_early:
-
-    if (printhelp) {
-      fprintf(stderr, "slipterm version " SLIPTERM_VERSION
-                      " usage:\n"
-                      "\t-h print this help message\n"
-                      "\t-r print autodetected port, and network and exit\n"
-                      "\t-q don't print extra messages message start\n"
-                      "\t-i [network interface to tap]\n"
-                      "\t-p [port]\n"
-                      "\t-b [baud rate to use on port]\n");
-      exit(0);
-    }
-  }
-#endif
+  const char *baud = "115200";
+  const char *port = NULL;
+  const char *iface = NULL;
+  const char *autodetect = NULL;
 
   // Parse options
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
-      selected_baud = atoi(argv[++i]);
+      baud = argv[++i];
     } else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
-      selected_iface = argv[++i];
+      iface = argv[++i];
     } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
-      selected_port = argv[++i];
+      port = argv[++i];
     } else if (strcmp(argv[i], "-r") == 0) {
-      printdetect = 2;
+      autodetect = "yes";
     } else {
       fprintf(stderr, "slipterm version " SLIPTERM_VERSION
                       " usage:\n"
@@ -241,7 +150,7 @@ int main(int argc, char **argv) {
     return -4;
   }
 
-  if (!selected_port) {
+  if (!port) {
     // No port selected. Autodetect.
     // Prefer ttyUSB to ttyACM.
     const char *searchports[] = {"/dev/ttyACM0", "/dev/ttyUSB0", 0};
@@ -249,11 +158,11 @@ int main(int argc, char **argv) {
     for (sp = searchports[0]; *sp; sp++) {
       struct stat statbuf = {0};
       if (stat(sp, &statbuf) == 0 && !S_ISDIR(statbuf)) {
-        selected_port = sp;
+        port = sp;
         break;
       }
     }
-    if (!selected_port) {
+    if (!port) {
       fprintf(stderr, "Error: Could not select a serial port for operation.\n");
     }
   }
@@ -293,18 +202,18 @@ int main(int argc, char **argv) {
     fprintf(stderr,
             "slipterm version " SLIPTERM_VERSION
             " configuration:\ninterface %s\nport %s\nbaud%d\n",
-            selected_iface, selected_port, selected_baud);
+            selected_iface, port, selected_baud);
 
     // If -r flag used, exit.
     if (printdetect == 2) exit(0);
   }
 
   // After this point, we are fully configured.
-  iSerialPort = open(selected_port, O_RDWR | O_SYNC);
+  iSerialPort = open(port, O_RDWR | O_SYNC);
 
   if (!iSerialPort) {
     fprintf(stderr, "Error: Could not open serial port \"%s\"\n",
-            selected_port);
+            port);
     return -12;
   }
 
@@ -319,7 +228,7 @@ int main(int argc, char **argv) {
     int r2 = ioctl(iSerialPort, TCSETS2, &tio);
     if (r1 || r2) {
       fprintf(stderr, "Warning: Could not set baud %d on serial port \"%s\".\n",
-              selected_baud, selected_port);
+              selected_baud, port);
     }
   }
 
