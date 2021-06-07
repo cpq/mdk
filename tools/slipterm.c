@@ -36,8 +36,8 @@
 #define SLIP_ESC_END         0334    /* ESC ESC_END means END data byte */
 #define SLIP_ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
 
+static int s_serial_fd = -1;  // Opened serial port
 #if 0
-int iSerialPort;
 int iRawSocket;
 pthread_t thdNetworkReceive;
 pthread_t thdUserInput;
@@ -53,7 +53,7 @@ void *NetworkReceiveThread(void *v) {
     int rx = recv(iRawSocket, rxbuff + 2, sizeof(rxbuff), 0);
     if (rx < 0) break;
     rxbuff[rx + 2] = SLIP_END;
-    if (write(iSerialPort, rxbuff, rx + 3) < 0) {
+    if (write(s_serial_fd, rxbuff, rx + 3) < 0) {
       fprintf(stderr,
               "Warning: could not write network frame to SLIP socket\n");
     }
@@ -85,7 +85,7 @@ void *UserInputThread(void *v) {
   int c;
   while ((c = getchar()) != EOF) {
     char ch[1] = {c};
-    write(iSerialPort, ch, 1);
+    write(s_serial_fd, ch, 1);
   }
 }
 
@@ -112,7 +112,7 @@ void SignalHandler(int signo) {
     fprintf(stderr, "Warning: Could not re-enable local echo on user input.\n");
   }
 
-  close(iSerialPort);
+  close(s_serial_fd);
   close(iRawSocket);
 #endif
 }
@@ -144,6 +144,12 @@ int main(int argc, char **argv) {
                       "\t-b [baud rate to use on port]\n");
       exit(0);
     }
+  }
+
+  s_serial_fd = open(port, O_RDWR | O_SYNC);
+  if (s_serial_fd < 0) {
+    fprintf(stderr, "Error: Could not open serial port \"%s\"\n", port);
+    return -12;
   }
 
 #if 0
@@ -212,9 +218,9 @@ int main(int argc, char **argv) {
   }
 
   // After this point, we are fully configured.
-  iSerialPort = open(port, O_RDWR | O_SYNC);
+  s_serial_fd = open(port, O_RDWR | O_SYNC);
 
-  if (!iSerialPort) {
+  if (!s_serial_fd) {
     fprintf(stderr, "Error: Could not open serial port \"%s\"\n",
             port);
     return -12;
@@ -223,12 +229,12 @@ int main(int argc, char **argv) {
   // Set baud rates
   {
     struct termios2 tio;
-    int r1 = ioctl(iSerialPort, TCGETS2, &tio);
+    int r1 = ioctl(s_serial_fd, TCGETS2, &tio);
     tio.c_cflag &= ~CBAUD;
     tio.c_cflag |= BOTHER;
     tio.c_ispeed = selected_baud;
     tio.c_ospeed = selected_baud;
-    int r2 = ioctl(iSerialPort, TCSETS2, &tio);
+    int r2 = ioctl(s_serial_fd, TCSETS2, &tio);
     if (r1 || r2) {
       fprintf(stderr, "Warning: Could not set baud %d on serial port \"%s\".\n",
               selected_baud, port);
@@ -279,132 +285,131 @@ int main(int argc, char **argv) {
 
   pthread_create(&thdNetworkReceive, 0, NetworkReceiveThread, 0);
   pthread_create(&thdUserInput, 0, UserInputThread, 0);
-
-
-  // The main loop:
-  //  Receive characters from the serial port and federate them appropriately.
-  {
-    enum {
-      STATE_DEFAULT,
-      STATE_DEFAULT_ESC,
-      STATE_IN_PACKET,
-      STATE_IN_PACKET_ESC,
-    };
-    int state = STATE_DEFAULT;
-
-    uint8_t buf[GENERAL_BUFFER_LENGTH];
-    uint8_t netbuf[NETWORK_BUFFER_LENGTH];
-    uint8_t textbuffer[GENERAL_BUFFER_LENGTH];
-    int networkbufferplace = 0;
-    int textbufferplace = 0;
-
-    while (1) {
-      int rx = read(iSerialPort, buf, sizeof(buf));
-
-      if (rx < 0) {
-        fprintf(stderr, "Error: Serial port read failed.\n");
-        return -19;
-      }
-
-      int i;
-      for (i = 0; i < rx; i++) {
-        uint8_t c = buf[i];
-        switch (state) {
-          case STATE_DEFAULT:
-            switch (c) {
-              case SLIP_ESC:
-                state = STATE_DEFAULT_ESC;
-                break;
-              default:
-                // SLIP_END is not special in terminal mode.
-                textbuffer[textbufferplace++] = c;
-                break;
-            }
-            break;
-
-          case STATE_DEFAULT_ESC:
-            switch (c) {
-              case SLIP_ESC_ESC:
-                textbuffer[textbufferplace++] = SLIP_ESC;
-                break;
-              case SLIP_ESC_END:
-                textbuffer[textbufferplace++] = SLIP_END;
-                break;
-              case SLIP_END:
-                state = STATE_IN_PACKET;
-                break;
-              default:
-                // Undefined behavior. Spurious esc?  Could use for
-                // other OOB comms.
-                break;
-            }
-            break;
-
-          case STATE_IN_PACKET:
-            switch (c) {
-              case SLIP_ESC:
-                state = STATE_IN_PACKET_ESC;
-                break;
-              case SLIP_END: {
-                TXMessage(netbuf, networkbufferplace);
-                networkbufferplace = 0;
-                state = STATE_DEFAULT;
-                break;
-              }
-              default:
-                netbuf[networkbufferplace++] = c;
-                if (networkbufferplace >= NETWORK_BUFFER_LENGTH) {
-                  // Packet too long. Abort back to terminal mode.
-                  // We were probably in termianl mode anyway.
-                  state = STATE_DEFAULT;
-                }
-                break;
-            }
-            break;
-
-          case STATE_IN_PACKET_ESC:
-            switch (c) {
-              case SLIP_ESC:
-              default:
-                // Neither of these are valid. Perhaps incorrect?
-                state = STATE_DEFAULT;
-                break;
-              case SLIP_END:
-                // We use this as another mechanism to indicate send.
-                // only difference here is we stay in network mode.
-                TXMessage(netbuf, networkbufferplace);
-                networkbufferplace = 0;
-                state = STATE_IN_PACKET;
-                break;
-              case SLIP_ESC_ESC:
-              case SLIP_ESC_END:
-                netbuf[networkbufferplace++] =
-                    (c == SLIP_ESC_ESC) ? SLIP_ESC : SLIP_END;
-
-                if (networkbufferplace >= NETWORK_BUFFER_LENGTH) {
-                  // Packet too long. Abort back to terminal mode.
-                  // We were probably in termianl mode anyway.
-                  state = STATE_DEFAULT;
-                }
-                state = STATE_IN_PACKET;
-            }
-            break;
-        }
-      }
-
-      if (textbufferplace) {
-        write(0, textbuffer, textbufferplace);
-      }
-    }
-  }
 #endif
 
   signal(SIGINT, SignalHandler);
   signal(SIGTERM, SignalHandler);
 
-  while (s_signo == 0) {
-    sleep(1);
+  // The main loop:
+  //  Receive characters from the serial port and federate them appropriately.
+  enum {
+    STATE_DEFAULT,
+    STATE_DEFAULT_ESC,
+    STATE_IN_PACKET,
+    STATE_IN_PACKET_ESC,
+  } state = STATE_DEFAULT;
+
+  uint8_t buf[GENERAL_BUFFER_LENGTH];
+  uint8_t netbuf[NETWORK_BUFFER_LENGTH];
+  uint8_t textbuffer[GENERAL_BUFFER_LENGTH];
+  int networkbufferplace = 0;
+  int textbufferplace = 0;
+
+  while (1) {
+    int rx = read(s_serial_fd, buf, sizeof(buf));
+
+    if (rx < 0) {
+      fprintf(stderr, "Error: Serial port read failed.\n");
+      return -19;
+    }
+
+    int i;
+    for (i = 0; i < rx; i++) {
+      uint8_t c = buf[i];
+      switch (state) {
+        case STATE_DEFAULT:
+          switch (c) {
+            case SLIP_ESC:
+              state = STATE_DEFAULT_ESC;
+              break;
+            default:
+              // SLIP_END is not special in terminal mode.
+              textbuffer[textbufferplace++] = c;
+              break;
+          }
+          break;
+
+        case STATE_DEFAULT_ESC:
+          switch (c) {
+            case SLIP_ESC_ESC:
+              textbuffer[textbufferplace++] = SLIP_ESC;
+              break;
+            case SLIP_ESC_END:
+              textbuffer[textbufferplace++] = SLIP_END;
+              break;
+            case SLIP_END:
+              state = STATE_IN_PACKET;
+              break;
+            default:
+              // Undefined behavior. Spurious esc?  Could use for
+              // other OOB comms.
+              break;
+          }
+          break;
+
+        case STATE_IN_PACKET:
+          switch (c) {
+            case SLIP_ESC:
+              state = STATE_IN_PACKET_ESC;
+              break;
+            case SLIP_END: {
+#if 0
+              TXMessage(netbuf, networkbufferplace);
+#endif
+              networkbufferplace = 0;
+              state = STATE_DEFAULT;
+              break;
+            }
+            default:
+              netbuf[networkbufferplace++] = c;
+              if (networkbufferplace >= NETWORK_BUFFER_LENGTH) {
+                // Packet too long. Abort back to terminal mode.
+                // We were probably in termianl mode anyway.
+                state = STATE_DEFAULT;
+              }
+              break;
+          }
+          break;
+
+        case STATE_IN_PACKET_ESC:
+          switch (c) {
+            case SLIP_ESC:
+            default:
+              // Neither of these are valid. Perhaps incorrect?
+              state = STATE_DEFAULT;
+              break;
+            case SLIP_END:
+              // We use this as another mechanism to indicate send.
+              // only difference here is we stay in network mode.
+#if 0
+              TXMessage(netbuf, networkbufferplace);
+#endif
+              networkbufferplace = 0;
+              state = STATE_IN_PACKET;
+              break;
+            case SLIP_ESC_ESC:
+            case SLIP_ESC_END:
+              netbuf[networkbufferplace++] =
+                  (c == SLIP_ESC_ESC) ? SLIP_ESC : SLIP_END;
+
+              if (networkbufferplace >= NETWORK_BUFFER_LENGTH) {
+                // Packet too long. Abort back to terminal mode.
+                // We were probably in termianl mode anyway.
+                state = STATE_DEFAULT;
+              }
+              state = STATE_IN_PACKET;
+          }
+          break;
+      }
+    }
+
+#if 0
+    if (textbufferplace) {
+      write(0, textbuffer, textbufferplace);
+    }
+#endif
   }
+
   printf("Exiting on signal %d\n", s_signo);
 
   return 0;
