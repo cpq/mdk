@@ -9,6 +9,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +37,14 @@
 #define SLIP_ESC_END         0334    /* ESC ESC_END means END data byte */
 #define SLIP_ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
 
-static int s_serial_fd = -1;  // Opened serial port
+static int fail(const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  exit(EXIT_FAILURE);
+}
+
 #if 0
 int iRawSocket;
 pthread_t thdNetworkReceive;
@@ -53,7 +61,7 @@ void *NetworkReceiveThread(void *v) {
     int rx = recv(iRawSocket, rxbuff + 2, sizeof(rxbuff), 0);
     if (rx < 0) break;
     rxbuff[rx + 2] = SLIP_END;
-    if (write(s_serial_fd, rxbuff, rx + 3) < 0) {
+    if (write(fd_serial, rxbuff, rx + 3) < 0) {
       fprintf(stderr,
               "Warning: could not write network frame to SLIP socket\n");
     }
@@ -85,7 +93,7 @@ void *UserInputThread(void *v) {
   int c;
   while ((c = getchar()) != EOF) {
     char ch[1] = {c};
-    write(s_serial_fd, ch, 1);
+    write(fd_serial, ch, 1);
   }
 }
 
@@ -112,7 +120,7 @@ void SignalHandler(int signo) {
     fprintf(stderr, "Warning: Could not re-enable local echo on user input.\n");
   }
 
-  close(s_serial_fd);
+  close(fd_serial);
   close(iRawSocket);
 #endif
 }
@@ -134,20 +142,19 @@ int main(int argc, char **argv) {
     } else if (strcmp(argv[i], "-r") == 0) {
       autodetect = "yes";
     } else {
-      fprintf(stderr, "slipterm version " SLIPTERM_VERSION
-                      " usage:\n"
-                      "\t-h print this help message\n"
-                      "\t-r print autodetected port, and network and exit\n"
-                      "\t-q don't print extra messages message start\n"
-                      "\t-i [network interface to tap]\n"
-                      "\t-p [port]\n"
-                      "\t-b [baud rate to use on port]\n");
-      exit(0);
+      fail("slipterm version " SLIPTERM_VERSION
+           " usage:\n"
+           "\t-h print this help message\n"
+           "\t-r print autodetected port, and network and exit\n"
+           "\t-q don't print extra messages message start\n"
+           "\t-i [network interface to tap]\n"
+           "\t-p [port]\n"
+           "\t-b [baud rate to use on port]\n");
     }
   }
 
-  s_serial_fd = open(port, O_RDWR | O_SYNC);
-  if (s_serial_fd < 0) {
+  int fd_serial = open(port, O_RDWR | O_SYNC);
+  if (fd_serial < 0) {
     fprintf(stderr, "Error: Could not open serial port \"%s\"\n", port);
     return -12;
   }
@@ -218,9 +225,9 @@ int main(int argc, char **argv) {
   }
 
   // After this point, we are fully configured.
-  s_serial_fd = open(port, O_RDWR | O_SYNC);
+  fd_serial = open(port, O_RDWR | O_SYNC);
 
-  if (!s_serial_fd) {
+  if (!fd_serial) {
     fprintf(stderr, "Error: Could not open serial port \"%s\"\n",
             port);
     return -12;
@@ -229,12 +236,12 @@ int main(int argc, char **argv) {
   // Set baud rates
   {
     struct termios2 tio;
-    int r1 = ioctl(s_serial_fd, TCGETS2, &tio);
+    int r1 = ioctl(fd_serial, TCGETS2, &tio);
     tio.c_cflag &= ~CBAUD;
     tio.c_cflag |= BOTHER;
     tio.c_ispeed = selected_baud;
     tio.c_ospeed = selected_baud;
-    int r2 = ioctl(s_serial_fd, TCSETS2, &tio);
+    int r2 = ioctl(fd_serial, TCSETS2, &tio);
     if (r1 || r2) {
       fprintf(stderr, "Warning: Could not set baud %d on serial port \"%s\".\n",
               selected_baud, port);
@@ -306,7 +313,7 @@ int main(int argc, char **argv) {
   int textbufferplace = 0;
 
   while (1) {
-    int rx = read(s_serial_fd, buf, sizeof(buf));
+    int rx = read(fd_serial, buf, sizeof(buf));
 
     if (rx < 0) {
       fprintf(stderr, "Error: Serial port read failed.\n");
@@ -409,6 +416,8 @@ int main(int argc, char **argv) {
     }
 #endif
   }
+
+  close(fd_serial);
 
   printf("Exiting on signal %d\n", s_signo);
 
