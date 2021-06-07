@@ -101,18 +101,21 @@ void TXMessage(uint8_t *netbuf, int networkbufferplace) {
     fprintf(stderr, "Warning: Could not transmit packet\n");
   }
 }
+#endif
 
-void SignalHandler() {
-  // Re-enable
+static int s_signo;
+void SignalHandler(int signo) {
+  s_signo = signo;
 
+#if 0
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &tSavedTermios) == -1) {
     fprintf(stderr, "Warning: Could not re-enable local echo on user input.\n");
   }
 
   close(iSerialPort);
   close(iRawSocket);
-}
 #endif
+}
 
 int main(int argc, char **argv) {
   const char *baud = "115200";
@@ -277,7 +280,6 @@ int main(int argc, char **argv) {
   pthread_create(&thdNetworkReceive, 0, NetworkReceiveThread, 0);
   pthread_create(&thdUserInput, 0, UserInputThread, 0);
 
-  signal(SIGINT, SignalHandler);
 
   // The main loop:
   //  Receive characters from the serial port and federate them appropriately.
@@ -396,6 +398,14 @@ int main(int argc, char **argv) {
     }
   }
 #endif
+
+  signal(SIGINT, SignalHandler);
+  signal(SIGTERM, SignalHandler);
+
+  while (s_signo == 0) {
+    sleep(1);
+  }
+  printf("Exiting on signal %d\n", s_signo);
 
   return 0;
 }
