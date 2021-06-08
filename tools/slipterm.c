@@ -117,9 +117,9 @@ int main(int argc, char **argv) {
     if (devs == NULL) fail("pcap_lookupdev: %s\n", errbuf);
     iface = devs[0].name;
   }
-  printf("Opened %s in live mode\n", iface);
   pcap_t *ph = pcap_open_live(iface, 0xffff, 1, 1, errbuf);
   if (ph == NULL) fail("pcap_open_live: %s\n", errbuf);
+  printf("Opened %s in live mode\n", iface);
   pcap_setnonblock(ph, 1, errbuf);
 
   // Apply BPF to reduce noise. Let in only broadcasts and our own traffic

@@ -10,17 +10,18 @@ Required tools: esptool and GCC. Install ESP-IDF and export the following
 environment variables:
 
 ```sh
-$ export TOOLCHAIN=/path-to-gcc/bin/PREFIX      # see note
-$ export ARCH=esp32                             # choices: esp32, c3
-$ export ESPTOOL=/path/to/esptool.py
-$ export PORT=/dev/ttyUSB0                      # serial port for flashing
+$ export TOOLCHAIN=riscv32-esp-elf      # $TOOLCHAIN-gcc must resolve to GCC
+$ export ARCH=c3                        # Choices: c3, esp32
+$ export ESPTOOL=/path/to/esptool.py    # Full path to esptool.py
+$ export PORT=/dev/ttyUSB0              # Serial port for flashing
+$ export PATH=$PATH:$(dirname $(find ~/.espressif -type f -name $TOOLCHAIN-gcc))
 ```
 
-The `TOOLCHAIN` variable should be set so `$(TOOLCHAIN)-gcc` resolves to a
-GCC binary.  E.g. on my workstation:
+Verify setup by running GCC:
 
 ```sh
-$ export TOOLCHAIN=$HOME/.espressif/tools/xtensa-esp32-elf/esp-2020r3-8.4.0/xtensa-esp32-elf/bin/xtensa-esp32-elf
+$ $TOOLCHAIN-gcc --help
+Usage: riscv32-esp-elf-gcc [options] file...
 ```
 
 # Project build

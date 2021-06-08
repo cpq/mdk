@@ -109,16 +109,16 @@ static void cnip_arp(struct cnip_if *ifp, struct eth *eth, struct arp *arp) {
   }
 }
 
-static uint16_t ipcsum(const uint16_t *p, const uint16_t *end) {
+static uint16_t ipcsum(const uint8_t *p, const uint8_t *end) {
   uint32_t sum = 0;
-  while (p < end) sum += *p++;
+  while (p < end) sum += (unsigned) ((((uint16_t) p[0]) << 8) | p[1]), p += 2;
   while (sum >> 16) sum = (sum & 0xffff) + (sum >> 16);
-  return (uint16_t) ~sum;
+  return NET16((uint16_t) ~sum);
 }
 
 static void set_ip_csum(struct ip *ip) {
   ip->csum = 0;
-  ip->csum = ipcsum((uint16_t *) ip, (uint16_t *) (ip + 1));
+  ip->csum = ipcsum((uint8_t *) ip, (uint8_t *) (ip + 1));
 }
 
 static void cnip_icmp(struct cnip_if *ifp, struct eth *eth, struct ip *ip,
