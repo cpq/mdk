@@ -20,7 +20,6 @@ int main(void) {
                           .ip = 0x0700a8c0};
   struct slip slip = {.size = netif.mtu, .buf = malloc(netif.mtu)};
   for (;;) spin(999999), sdk_log("%p\n", malloc(1));
-  for (;;) spin(999999), sdk_log("%p %p %d\n", &_end, &_eram, &_eram - &_end);
 
   bool got_ipaddr = true;
   unsigned long uptime_ms = 0;  // Pretend we know what time it is
