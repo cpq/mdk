@@ -74,7 +74,7 @@ that checks for the `__unix__` or `__APPLE__` defines. If either is set, then:
   `src/init.c`
 - instead of the toolchain's crosscompiler, a host's `$(CC)` compiler is used
   and a usial UNIX binary is built as a firmware file.
-- Firmware uses `/dev/ptyp17` as a UART device. Note: so to "talk" to the
+- Firmware uses `/dev/ttyp17` as a UART device. Note: so to "talk" to the
   firmware via UART, `/dev/ttyp17` should be used.
 
 This helps to mock/test SDK or firmware functionality without an actual

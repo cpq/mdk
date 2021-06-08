@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <stdio.h>
+#include <termios.h>
 #include <unistd.h>
 
 int uart_tx(uint8_t ch);

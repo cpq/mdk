@@ -52,20 +52,34 @@ void startup(void) {
 
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
 char _sbss, _ebss, _end, _eram;
-int s_uart = -1;
-static void open_uart(void) {
-  s_uart = open("/dev/ptyp17", O_RDWR | O_NOCTTY | O_SYNC);
-  // set_interface_attribs(s_uart, 115200);
+static int s_uart = -1;
+static int open_serial(const char *name, int speed) {
+  int fd = open(name, O_RDWR | O_NONBLOCK);
+  struct termios tio;
+  if (fd >= 0 && tcgetattr(fd, &tio) == 0) {
+    cfsetospeed(&tio, (speed_t) speed);
+    cfsetispeed(&tio, (speed_t) speed);
+    tio.c_cflag = CS8 | CREAD | CLOCAL | PARENB;
+    tio.c_lflag = 0;
+    tio.c_oflag = 0;
+    tio.c_iflag = 0;  // IGNBRK | IGNPAR | IGNCR;
+    tcsetattr(fd, TCSANOW, &tio);
+  }
+  printf("Opened %s @ %d\n", name, speed);
+  return fd;
 }
+static const char *s_serial_dev = "/dev/ptyp3";
 int uart_tx(uint8_t ch) {
-  if (s_uart < 0) open_uart();
-  return write(s_uart, &ch, 1) == 1 ? 0 : -1;
+  if (s_uart < 0) s_uart = open_serial(s_serial_dev, 115200);
+  while (write(s_uart, &ch, 1) != 1) (void) 0;
+  return 0;
 }
 int uart_rx(uint8_t *ch) {
-  if (s_uart < 0) open_uart();
+  if (s_uart < 0) s_uart = open_serial(s_serial_dev, 115200);
   return read(s_uart, ch, 1) == 1 ? 0 : -1;
 }
 int uart_tx_one_char(uint8_t ch) {
-  return uart_tx(ch);
+  // return uart_tx(ch);
+  return write(1, &ch, 1) > 0 ? 0 : -1;
 }
 #endif

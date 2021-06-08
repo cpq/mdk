@@ -9,6 +9,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pcap.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,26 +18,13 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define GENERAL_BUFFER_LENGTH 2048
-#define NETWORK_BUFFER_LENGTH 2048
+#include "slip.h"  // SLIP state machine logic
 
+static int s_signo;
 
-// This is from RFC1055 - BUT we have a departure.  SLIP_END puts the system
-// into regular serial mode.  In order to enter packet mode, we expect to see
-// SLIP_ESC followed by SLIP_END. SLIP_END has no effect in serial mode.
-//
-// It goes: 
-//   STANDARD MODE (default) -> SLIP_ESC -> SLIP_END -> NETWORK MODE
-//   NETWORK MODE -> SLIP_END -> STANDARD MODE
-//   NETWORK MODE -> SLIP_ESC -> SLIP_END -> NETWORK MODE
-//
-// Therefore, you can't just resend a SLIP_END when in network mode to send
-//  a new packet.
-
-#define SLIP_END             0300    /* indicates end of packet */
-#define SLIP_ESC             0333    /* indicates byte stuffing */
-#define SLIP_ESC_END         0334    /* ESC ESC_END means END data byte */
-#define SLIP_ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
+void signal_handler(int signo) {
+  s_signo = signo;
+}
 
 static int fail(const char *fmt, ...) {
   va_list ap;
@@ -45,91 +34,58 @@ static int fail(const char *fmt, ...) {
   exit(EXIT_FAILURE);
 }
 
-#if 0
-int iRawSocket;
-pthread_t thdNetworkReceive;
-pthread_t thdUserInput;
-struct termios tSavedTermios;
-struct ifreq ifrInterface;
-struct sockaddr_ll saRaw;
-
-void *NetworkReceiveThread(void *v) {
-  uint8_t rxbuff[NETWORK_BUFFER_LENGTH + 3] = {0};
-  rxbuff[0] = SLIP_ESC;
-  rxbuff[1] = SLIP_END;
-  while (1) {
-    int rx = recv(iRawSocket, rxbuff + 2, sizeof(rxbuff), 0);
-    if (rx < 0) break;
-    rxbuff[rx + 2] = SLIP_END;
-    if (write(fd_serial, rxbuff, rx + 3) < 0) {
-      fprintf(stderr,
-              "Warning: could not write network frame to SLIP socket\n");
+static char *hexdump(const void *buf, size_t len, char *dst, size_t dlen) {
+  const unsigned char *p = (const unsigned char *) buf;
+  size_t i, idx, n = 0, ofs = 0;
+  char ascii[17] = "";
+  if (dst == NULL) return dst;
+  memset(dst, ' ', dlen);
+  for (i = 0; i < len; i++) {
+    idx = i % 16;
+    if (idx == 0) {
+      if (i > 0 && dlen > n)
+        n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
+      if (dlen > n)
+        n += (size_t) snprintf(dst + n, dlen - n, "%04x ", (int) (i + ofs));
     }
+    if (dlen < n) break;
+    n += (size_t) snprintf(dst + n, dlen - n, " %02x", p[i]);
+    ascii[idx] = (char) (p[i] < 0x20 || p[i] > 0x7e ? '.' : p[i]);
+    ascii[idx + 1] = '\0';
   }
-
-  fprintf(stderr, "Error: Network disconnected. Exiting.\n");
-
-  exit(-1);
+  while (i++ % 16) {
+    if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "%s", "   ");
+  }
+  if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
+  if (n > dlen - 1) n = dlen - 1;
+  dst[n] = '\0';
+  return dst;
 }
 
-void *UserInputThread(void *v) {
-  // TODO: Configure user input to disable local echo.
-
-  struct termios tp;
-  if (tcgetattr(STDIN_FILENO, &tp) == -1) {
-    fprintf(stderr, "Warning: Could not get local echo on user input.\n");
+static int open_serial(const char *name, int baud) {
+  int fd = open(name, O_RDWR);
+  struct termios tio;
+  if (fd >= 0 && tcgetattr(fd, &tio) == 0) {
+    tio.c_ispeed = tio.c_ospeed = baud;  // Input speed = output speed = baud
+    tio.c_cflag = CS8 | CREAD | CLOCAL;
+    tio.c_lflag = tio.c_oflag = tio.c_iflag = 0;
+    tcsetattr(fd, TCSANOW, &tio);
   }
-
-  // Backup reg.
-  tSavedTermios = tp;
-
-  tp.c_lflag &= ~ECHO;    // Disable local echo.
-  tp.c_lflag &= ~ICANON;  // Also disable canonical mode.
-
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &tp) == -1) {
-    fprintf(stderr, "Warning: Could not disable local echo on user input.\n");
-  }
-
-  int c;
-  while ((c = getchar()) != EOF) {
-    char ch[1] = {c};
-    write(fd_serial, ch, 1);
-  }
+  printf("Opened %s @ %d\n", name, baud);
+  return fd;
 }
 
-void TXMessage(uint8_t *netbuf, int networkbufferplace) {
-  // Acutally received a packet!
-  saRaw.sll_ifindex = ifrInterface.ifr_ifindex;
-  saRaw.sll_halen = ETH_ALEN;
-  memcpy(saRaw.sll_addr, netbuf + 6, 6);
-
-  if (sendto(iRawSocket, netbuf, networkbufferplace, 0,
-             (struct sockaddr *) &socket_address,
-             sizeof(struct sockaddr_ll)) < 0) {
-    fprintf(stderr, "Warning: Could not transmit packet\n");
-  }
-}
-#endif
-
-static int s_signo;
-void SignalHandler(int signo) {
-  s_signo = signo;
-
-#if 0
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &tSavedTermios) == -1) {
-    fprintf(stderr, "Warning: Could not re-enable local echo on user input.\n");
-  }
-
-  close(fd_serial);
-  close(iRawSocket);
-#endif
+static void uart_tx(unsigned char byte, void *arg) {
+  int len = write(*(int *) arg, &byte, 1);
+  (void) len;  // Shut up GCC
 }
 
 int main(int argc, char **argv) {
   const char *baud = "115200";
-  const char *port = NULL;
+  const char *port = "/dev/ttyUSB0";
   const char *iface = NULL;
-  const char *autodetect = NULL;
+  const char *bpf = NULL;
+  // const char *bpf = "ether host 1:2:3:4:5:6 or ether dst ff:ff:ff:ff:ff:ff";
 
   // Parse options
   for (int i = 1; i < argc; i++) {
@@ -139,285 +95,103 @@ int main(int argc, char **argv) {
       iface = argv[++i];
     } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
       port = argv[++i];
-    } else if (strcmp(argv[i], "-r") == 0) {
-      autodetect = "yes";
+    } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
+      bpf = argv[++i];
     } else {
-      fail("slipterm version " SLIPTERM_VERSION
-           " usage:\n"
-           "\t-h print this help message\n"
-           "\t-r print autodetected port, and network and exit\n"
-           "\t-q don't print extra messages message start\n"
-           "\t-i [network interface to tap]\n"
-           "\t-p [port]\n"
-           "\t-b [baud rate to use on port]\n");
+      return fail(
+          "slipterm version %s\n"
+          "Usage: %s [OPTIONS]\n"
+          "  -i NETIF\t - network iface, e.g. en0, eth0. Default: NULL\n"
+          "  -f FILTER\t - BPF filter. Default: %s\n"
+          "  -b BAUD\t - serial speed. Default: %s\n"
+          "  -p PORT\t - serial device. Default: %s\n",
+          SLIPTERM_VERSION, argv[0], bpf, baud, port);
     }
   }
 
-  int fd_serial = open(port, O_RDWR | O_SYNC);
-  if (fd_serial < 0) {
-    fprintf(stderr, "Error: Could not open serial port \"%s\"\n", port);
-    return -12;
+  // Open network interface
+  char errbuf[PCAP_ERRBUF_SIZE] = "";
+  if (iface == NULL) {
+    pcap_if_t *devs = NULL;
+    pcap_findalldevs(&devs, errbuf);
+    if (devs == NULL) fail("pcap_lookupdev: %s\n", errbuf);
+    iface = devs[0].name;
+  }
+  printf("Opened %s in live mode\n", iface);
+  pcap_t *ph = pcap_open_live(iface, 0xffff, 1, 1, errbuf);
+  if (ph == NULL) fail("pcap_open_live: %s\n", errbuf);
+  pcap_setnonblock(ph, 1, errbuf);
+
+  // Apply BPF to reduce noise. Let in only broadcasts and our own traffic
+  if (bpf != NULL) {
+    struct bpf_program bpfp;
+    if (pcap_compile(ph, &bpfp, bpf, 1, 0)) fail("compile \n");
+    pcap_setfilter(ph, &bpfp);
+    pcap_freecode(&bpfp);
   }
 
-#if 0
-  // Tricky: If the baud rate given was bad, abort.
-  if (selected_baud == 0) {
-    fprintf(stderr, "Error: invalid baud rate.\n");
-    return -4;
-  }
+  // Ok here are 3 sources we're going to listen on
+  int uart_fd = open_serial(port, atoi(baud));
+  int pcap_fd = pcap_get_selectable_fd(ph);
+  int stdin_fd = 0;  // Keep in canonical mode to allow Ctrl-C
 
-  if (!port) {
-    // No port selected. Autodetect.
-    // Prefer ttyUSB to ttyACM.
-    const char *searchports[] = {"/dev/ttyACM0", "/dev/ttyUSB0", 0};
-    const char *sp;
-    for (sp = searchports[0]; *sp; sp++) {
-      struct stat statbuf = {0};
-      if (stat(sp, &statbuf) == 0 && !S_ISDIR(statbuf)) {
-        port = sp;
-        break;
-      }
+  signal(SIGINT, signal_handler);
+  signal(SIGTERM, signal_handler);
+
+  // Initialise SLIP state machine
+  uint8_t slipbuf[2048];
+  struct slip slip = {.buf = slipbuf, .size = sizeof(slipbuf)};
+
+  // Main loop. Listen for input from UART, PCAP, and STDIN.
+  while (s_signo == 0) {
+    fd_set rset;
+    FD_ZERO(&rset);
+    FD_SET(uart_fd, &rset);
+    FD_SET(pcap_fd, &rset);
+    FD_SET(stdin_fd, &rset);
+
+    // See if there is something for us..
+    int max = uart_fd > pcap_fd ? uart_fd + 1 : pcap_fd + 1;
+    if (select(max, &rset, 0, 0, 0) <= 0) continue;
+
+    // Maybe there is something on the network?
+    if (FD_ISSET(pcap_fd, &rset)) {
+      struct pcap_pkthdr *hdr = NULL;
+      const unsigned char *pkt = NULL;
+      if (pcap_next_ex(ph, &hdr, &pkt) != 1) continue;  // Yea, fetch packet
+      char hd[hdr->len * 5 + 100];                      // Hexdump buffer
+      printf("NET -> DEV [%d bytes]\n%s\n", hdr->len,
+             hexdump(pkt, hdr->len, hd, sizeof(hd)));
+      slip_send(pkt, hdr->len, uart_tx, &uart_fd);  // Forward to serial
     }
-    if (!port) {
-      fprintf(stderr, "Error: Could not select a serial port for operation.\n");
-    }
-  }
 
-  if (!selected_iface) {
-    // The following gist points out how much easier using /proc/net/route is
-    // we are going to prefer that over `NETLINK_ROUTE`
-    // https://gist.github.com/javiermon/6272065
-
-    FILE *f = fopen("/proc/net/route", "r");
-    if (f) {
-      char iface[IF_NAMESIZE];
-      char buf[GENERAL_BUFFER_LENGTH];
-      while (fgets(buf, sizeof(buf), f)) {
-        unsigned long dest;
-        int r = sscanf(buf, "%s %lx", iface, &dest);
-        if (r == 2 && dest == 0) {
-          // Default gateway.
-          selected_iface = strdup(iface);
-          break;
+    // Maybe a device has sent us something
+    if (FD_ISSET(uart_fd, &rset)) {
+      uint8_t buf[BUFSIZ];
+      int n = read(uart_fd, buf, sizeof(buf));   // Read
+      if (n <= 0) fail("Serial line closed\n");  // If serial is closed, exit
+      for (int i = 0; i < n; i++) {
+        size_t len = slip_recv(buf[i], &slip);  // Pass to SLIP state machine
+        if (len == 0 && slip.mode == 0) putchar(buf[i]);  // In serial mode
+        if (len > 0) {                                    // We've got a frame!
+          char hd[len * 5 + 100];                         // Hexdump buffer
+          printf("DEV -> NET [%d bytes]\n%s\n", (int) len,
+                 hexdump(slip.buf, len, hd, sizeof(hd)));
+          pcap_inject(ph, slip.buf, len);  // Forward to network
         }
       }
-      fclose(f);
-    } else {
-      fprintf(stderr,
-              "Error: /proc/net/route unopenable. Need interface selected.\n");
-      exit(-9);
     }
 
-    if (!selected_iface) {
-      fprintf(stderr, "Error: could not autodetect an interface.\n");
-      exit(-9);
+    // If a user types something and presses enter, forward to a device
+    if (FD_ISSET(stdin_fd, &rset)) {
+      uint8_t buf[BUFSIZ];
+      int n = read(stdin_fd, buf, sizeof(buf));
+      for (int i = 0; i < n; i++) uart_tx(buf[i], &uart_fd);
     }
   }
 
-  if (printdetect) {
-    fprintf(stderr,
-            "slipterm version " SLIPTERM_VERSION
-            " configuration:\ninterface %s\nport %s\nbaud%d\n",
-            selected_iface, port, selected_baud);
-
-    // If -r flag used, exit.
-    if (printdetect == 2) exit(0);
-  }
-
-  // After this point, we are fully configured.
-  fd_serial = open(port, O_RDWR | O_SYNC);
-
-  if (!fd_serial) {
-    fprintf(stderr, "Error: Could not open serial port \"%s\"\n",
-            port);
-    return -12;
-  }
-
-  // Set baud rates
-  {
-    struct termios2 tio;
-    int r1 = ioctl(fd_serial, TCGETS2, &tio);
-    tio.c_cflag &= ~CBAUD;
-    tio.c_cflag |= BOTHER;
-    tio.c_ispeed = selected_baud;
-    tio.c_ospeed = selected_baud;
-    int r2 = ioctl(fd_serial, TCSETS2, &tio);
-    if (r1 || r2) {
-      fprintf(stderr, "Warning: Could not set baud %d on serial port \"%s\".\n",
-              selected_baud, port);
-    }
-  }
-
-  iRawSocket = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-  if (iRawSocket < 0) {
-    fprintf(stderr, "Error: Can't open network device.\n");
-    return -15;
-  }
-
-  {
-    // Configure interface.
-    int ifnamelen = strlen(selected_iface);
-    if (ifnamelen >= sizeof(ifrInterface.ifr_name)) {
-      fprintf(stderr, "Error: name of interface too long.\n");
-      return -16;
-    }
-    memcpy(ifrInterface.ifr_name, selected_iface, ifnamelen);
-    ifrInterface.ifr_name[ifnamelen] = 0;
-
-    ioctl(iRawSocket, SIOCGIFINDEX, &ifrInterface);
-
-    memset(&saRaw, 0, sizeof(saRaw));
-    saRaw.sll_family = PF_PACKET;
-    saRaw.sll_protocol = 0x0000;
-    saRaw.sll_ifindex = ifrInterface.ifr_ifindex;
-    saRaw.sll_hatype = 0;
-    saRaw.sll_pkttype = PACKET_HOST;
-
-    // Not sure why, this is required for receiving on some systems.
-    int r = bind(iRawSocket, (const struct sockaddr *) &saRaw, sizeof(saRaw));
-    if (r < 0) {
-      fprintf(stderr, "Error: Could not bind to inerface. Error %d\n", errno);
-      return -18;
-    }
-
-    r = setsockopt(iRawSocket, SOL_SOCKET, SO_BINDTODEVICE, selected_iface,
-                   ifnamelen);
-
-    if (r < 0) {
-      fprintf(stderr,
-              "Warning: Interface could not bind."
-              "Networking probably will not work.\n");
-    }
-  }
-
-  pthread_create(&thdNetworkReceive, 0, NetworkReceiveThread, 0);
-  pthread_create(&thdUserInput, 0, UserInputThread, 0);
-#endif
-
-  signal(SIGINT, SignalHandler);
-  signal(SIGTERM, SignalHandler);
-
-  // The main loop:
-  //  Receive characters from the serial port and federate them appropriately.
-  enum {
-    STATE_DEFAULT,
-    STATE_DEFAULT_ESC,
-    STATE_IN_PACKET,
-    STATE_IN_PACKET_ESC,
-  } state = STATE_DEFAULT;
-
-  uint8_t buf[GENERAL_BUFFER_LENGTH];
-  uint8_t netbuf[NETWORK_BUFFER_LENGTH];
-  uint8_t textbuffer[GENERAL_BUFFER_LENGTH];
-  int networkbufferplace = 0;
-  int textbufferplace = 0;
-
-  while (1) {
-    int rx = read(fd_serial, buf, sizeof(buf));
-
-    if (rx < 0) {
-      fprintf(stderr, "Error: Serial port read failed.\n");
-      return -19;
-    }
-
-    int i;
-    for (i = 0; i < rx; i++) {
-      uint8_t c = buf[i];
-      switch (state) {
-        case STATE_DEFAULT:
-          switch (c) {
-            case SLIP_ESC:
-              state = STATE_DEFAULT_ESC;
-              break;
-            default:
-              // SLIP_END is not special in terminal mode.
-              textbuffer[textbufferplace++] = c;
-              break;
-          }
-          break;
-
-        case STATE_DEFAULT_ESC:
-          switch (c) {
-            case SLIP_ESC_ESC:
-              textbuffer[textbufferplace++] = SLIP_ESC;
-              break;
-            case SLIP_ESC_END:
-              textbuffer[textbufferplace++] = SLIP_END;
-              break;
-            case SLIP_END:
-              state = STATE_IN_PACKET;
-              break;
-            default:
-              // Undefined behavior. Spurious esc?  Could use for
-              // other OOB comms.
-              break;
-          }
-          break;
-
-        case STATE_IN_PACKET:
-          switch (c) {
-            case SLIP_ESC:
-              state = STATE_IN_PACKET_ESC;
-              break;
-            case SLIP_END: {
-#if 0
-              TXMessage(netbuf, networkbufferplace);
-#endif
-              networkbufferplace = 0;
-              state = STATE_DEFAULT;
-              break;
-            }
-            default:
-              netbuf[networkbufferplace++] = c;
-              if (networkbufferplace >= NETWORK_BUFFER_LENGTH) {
-                // Packet too long. Abort back to terminal mode.
-                // We were probably in termianl mode anyway.
-                state = STATE_DEFAULT;
-              }
-              break;
-          }
-          break;
-
-        case STATE_IN_PACKET_ESC:
-          switch (c) {
-            case SLIP_ESC:
-            default:
-              // Neither of these are valid. Perhaps incorrect?
-              state = STATE_DEFAULT;
-              break;
-            case SLIP_END:
-              // We use this as another mechanism to indicate send.
-              // only difference here is we stay in network mode.
-#if 0
-              TXMessage(netbuf, networkbufferplace);
-#endif
-              networkbufferplace = 0;
-              state = STATE_IN_PACKET;
-              break;
-            case SLIP_ESC_ESC:
-            case SLIP_ESC_END:
-              netbuf[networkbufferplace++] =
-                  (c == SLIP_ESC_ESC) ? SLIP_ESC : SLIP_END;
-
-              if (networkbufferplace >= NETWORK_BUFFER_LENGTH) {
-                // Packet too long. Abort back to terminal mode.
-                // We were probably in termianl mode anyway.
-                state = STATE_DEFAULT;
-              }
-              state = STATE_IN_PACKET;
-          }
-          break;
-      }
-    }
-
-#if 0
-    if (textbufferplace) {
-      write(0, textbuffer, textbufferplace);
-    }
-#endif
-  }
-
-  close(fd_serial);
+  pcap_close(ph);
+  close(uart_fd);
 
   printf("Exiting on signal %d\n", s_signo);
 

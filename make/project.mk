@@ -32,7 +32,7 @@ unix: MCUFLAGS =
 unix: OPTFLAGS = -O0 -g3
 unix: $(SOURCES)
 	@mkdir -p $(OBJ_PATH)
-	$(CC) $(CFLAGS) $(SOURCES) -o $(OBJ_PATH)/firmware
+	$(CC) $(CFLAGS) $(filter-out $(ROOT_PATH)/src/malloc.c,$(SOURCES)) -o $(OBJ_PATH)/firmware
 
 $(OBJ_PATH)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -40,10 +40,11 @@ $(OBJ_PATH)/%.o: %.c
 
 $(OBJ_PATH)/boot.o: $(ROOT_PATH)/boot/boot_$(ARCH).s
 	@mkdir -p $(dir $@)
-	$(TOOLCHAIN)-as -g --warn --fatal-warnings $(MCUFLAGS) $< -o $@
+	$(TOOLCHAIN)-gcc $(CFLAGS) -c $< -o $@
+#	$(TOOLCHAIN)-as -g3 --warn --fatal-warnings $(MCUFLAGS) $< -o $@
 
 $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
-	$(TOOLCHAIN)-ld $(OBJECTS) $(LINKFLAGS) -o $@ 
+	$(TOOLCHAIN)-gcc -Xlinker $(OBJECTS) $(LINKFLAGS) -o $@
 	$(TOOLCHAIN)-size $@
 
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
