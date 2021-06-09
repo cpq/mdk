@@ -42,11 +42,9 @@ void __assert_func(const char *a, int b, const char *c, const char *d) {
 // Initialise memory and other low level stuff, and call main()
 void startup(void) {
   extern char _sbss, _ebss;
-  memset(&_sbss, 0, (size_t)(&_ebss - &_sbss));
-
+  for (char *p = &_sbss; p < &_ebss;) *p++ = '\0';
   extern char _end, _eram;
   sdk_heap_init(&_end, &_eram);
-
   main();
 }
 

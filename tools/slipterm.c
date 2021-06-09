@@ -34,34 +34,6 @@ static int fail(const char *fmt, ...) {
   exit(EXIT_FAILURE);
 }
 
-static char *hexdump(const void *buf, size_t len, char *dst, size_t dlen) {
-  const unsigned char *p = (const unsigned char *) buf;
-  size_t i, idx, n = 0, ofs = 0;
-  char ascii[17] = "";
-  if (dst == NULL) return dst;
-  memset(dst, ' ', dlen);
-  for (i = 0; i < len; i++) {
-    idx = i % 16;
-    if (idx == 0) {
-      if (i > 0 && dlen > n)
-        n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
-      if (dlen > n)
-        n += (size_t) snprintf(dst + n, dlen - n, "%04x ", (int) (i + ofs));
-    }
-    if (dlen < n) break;
-    n += (size_t) snprintf(dst + n, dlen - n, " %02x", p[i]);
-    ascii[idx] = (char) (p[i] < 0x20 || p[i] > 0x7e ? '.' : p[i]);
-    ascii[idx + 1] = '\0';
-  }
-  while (i++ % 16) {
-    if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "%s", "   ");
-  }
-  if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
-  if (n > dlen - 1) n = dlen - 1;
-  dst[n] = '\0';
-  return dst;
-}
-
 static int open_serial(const char *name, int baud) {
   int fd = open(name, O_RDWR);
   struct termios tio;
@@ -85,7 +57,7 @@ int main(int argc, char **argv) {
   const char *port = "/dev/ttyUSB0";
   const char *iface = NULL;
   const char *bpf = NULL;
-  // const char *bpf = "ether host 1:2:3:4:5:6 or ether dst ff:ff:ff:ff:ff:ff";
+  // const char *bpf = "host 192.168.0.7 or ether host ff:ff:ff:ff:ff:ff";
 
   // Parse options
   for (int i = 1; i < argc; i++) {
@@ -104,7 +76,8 @@ int main(int argc, char **argv) {
           "  -i NETIF\t - network iface, e.g. en0, eth0. Default: NULL\n"
           "  -f FILTER\t - BPF filter. Default: %s\n"
           "  -b BAUD\t - serial speed. Default: %s\n"
-          "  -p PORT\t - serial device. Default: %s\n",
+          "  -p PORT\t - serial device. Default: %s\n"
+          "",
           SLIPTERM_VERSION, argv[0], bpf, baud, port);
     }
   }
@@ -159,9 +132,6 @@ int main(int argc, char **argv) {
       struct pcap_pkthdr *hdr = NULL;
       const unsigned char *pkt = NULL;
       if (pcap_next_ex(ph, &hdr, &pkt) != 1) continue;  // Yea, fetch packet
-      char hd[hdr->len * 5 + 100];                      // Hexdump buffer
-      printf("NET -> DEV [%d bytes]\n%s\n", hdr->len,
-             hexdump(pkt, hdr->len, hd, sizeof(hd)));
       slip_send(pkt, hdr->len, uart_tx, &uart_fd);  // Forward to serial
     }
 
@@ -173,12 +143,8 @@ int main(int argc, char **argv) {
       for (int i = 0; i < n; i++) {
         size_t len = slip_recv(buf[i], &slip);  // Pass to SLIP state machine
         if (len == 0 && slip.mode == 0) putchar(buf[i]);  // In serial mode
-        if (len > 0) {                                    // We've got a frame!
-          char hd[len * 5 + 100];                         // Hexdump buffer
-          printf("DEV -> NET [%d bytes]\n%s\n", (int) len,
-                 hexdump(slip.buf, len, hd, sizeof(hd)));
-          pcap_inject(ph, slip.buf, len);  // Forward to network
-        }
+        if (len <= 0) continue;
+        pcap_inject(ph, slip.buf, len);  // Forward to network
       }
     }
 

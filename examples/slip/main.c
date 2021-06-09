@@ -18,13 +18,17 @@ int main(void) {
                           .mtu = 1600,
                           .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3},
                           .ip = 0x0700a8c0};
+  // sdk_log("%s\n", "hi from slip example");
+  // for (int i = 0;; i++)
+  // spin(999999), sdk_log("%p %d\n", malloc(256), sdk_ram_free());
+  // for (int i = 0;; i++) spin(999999), sdk_log("%p\n", malloc(1));
   struct slip slip = {.size = netif.mtu, .buf = malloc(netif.mtu)};
-  for (;;) spin(999999), sdk_log("%p\n", malloc(1));
+  sdk_log("%s\n", "hi from slip example");
+  sdk_log("Allocated %d bytes @ %p for netif frame\n", netif.mtu, slip.buf);
 
-  bool got_ipaddr = true;
+  bool got_ipaddr = netif.ip != 0;
   unsigned long uptime_ms = 0;  // Pretend we know what time it is
 
-  sdk_log("Starting SLIP, max frame len %u\n", netif.mtu);
   for (;;) {
     uint8_t c;
     if (uart_rx(&c) == 0) {
@@ -33,7 +37,6 @@ int main(void) {
       if (len == 0 && slip.mode == 0) sdk_log("%c", c);
     }
     cnip_poll(&netif, uptime_ms++);  // Let IP stack process things
-    continue;
     if (got_ipaddr == false && netif.ip != 0) {
       sdk_log("ip %x, mask %x, gw %x\n", netif.ip, netif.mask, netif.gw);
       got_ipaddr = true;

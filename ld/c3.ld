@@ -1,18 +1,25 @@
 MEMORY {
   iache  (rwx)  : ORIGIN = 0X4037c000, LENGTH = 16k
-  iram   (rwx)  : ORIGIN = 0x40381000, LENGTH = 32k 
-  dram   (rw)   : ORIGIN = 0x3fc80000, LENGTH = 32k
+  iram   (rwx)  : ORIGIN = 0x40380400, LENGTH = 32k 
+  dram   (rw)   : ORIGIN = 0x3fc80000, LENGTH = 128k
 }
 
 _eram = ORIGIN(dram) + LENGTH(dram);
 ENTRY(_reset)
 
 SECTIONS {
-  /* .vectors  : { KEEP(*(.vectors))   } > iram */
-  .text     : { *(.text*) *(.text)  } > iram
+  .text     : { *(.text) *(.text*) } > iram
+
+  /*
+   * This section is required to skip .iram.text area because iram and dram
+   * dram reflect the same address space on different buses.
+   */
+  .dram.skip (NOLOAD): {
+    . = ORIGIN(dram) + LENGTH(iram);
+  } > dram
 
   .data : {
-    . = ALIGN(4);
+    . = ALIGN(16);
     _sdata = .;
     *(.data)
     *(.data*)
@@ -20,21 +27,24 @@ SECTIONS {
     *(.rodata*)
     *(.gnu.linkonce.r.*)
     *(.rodata1)
-    . = ALIGN(4);
+    *(.riscv.*)
+    . = ALIGN(16);
     _edata = .;
   } > dram
 
   .bss : {
-    . = ALIGN(4);
+    . = ALIGN(16);
     _sbss = .;
     *(.bss)
     *(.bss*)
+    *(.sbss)
+    *(.sbss*)
     *(COMMON)
-    . = ALIGN(4);
+    . = ALIGN(16);
     _ebss = .;
   } > dram
 
-  . = ALIGN(4);
+  . = ALIGN(16);
   PROVIDE(end = .);
   PROVIDE(_end = .);
 }
@@ -109,4 +119,3 @@ PROVIDE(uart_tx_one_char2 = 0x4000006c);
 PROVIDE(uart_rx_one_char = 0x40000070);
 PROVIDE(uart_rx_one_char_block = 0x40000074);
 PROVIDE(uart_rx_readbuff = 0x40000078);
-  

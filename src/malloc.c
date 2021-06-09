@@ -34,47 +34,46 @@ struct block {
   struct block *next;
 };
 
-static struct block s_blocks = {0, 0};
+static struct block *s_free;
 extern void *sbrk(int);
 
 void *malloc(size_t size) {
-  const size_t align_to = 8;
+  const size_t align_to = 16;
   size = (size + sizeof(size_t) + (align_to - 1)) & ~(align_to - 1);
-  struct block *block = s_blocks.next, **head = &s_blocks.next;
-  while (block != 0) {
-    if (block->size >= size) {
-      *head = block->next;
-      return ((char *) block) + sizeof(size_t);
-    }
-    head = &block->next;
-    block = block->next;
+
+  struct block **h = &s_free;
+  while (*h != NULL && (*h)->size < size) h = &(*h)->next;
+  if (*h != NULL) {
+    *h = (*h)->next;
+    return &(*h)->next;
   }
-  block = (struct block *) sbrk((int) size);
+
+  struct block *block = (struct block *) sbrk((int) size);
   if (block == NULL) return block;
   block->size = size;
-  return ((char *) block) + sizeof(size_t);
+  return &block->next;
 }
 
 void free(void *ptr) {
-  struct block *block = (struct block *) (((char *) ptr) - sizeof(size_t));
-  block->next = s_blocks.next;
-  s_blocks.next = block;
+  struct block *block = (struct block *) (((size_t *) ptr) - 1);
+  block->next = s_free;
+  s_free = block;
 }
 
 void *calloc(size_t nmemb, size_t size) {
   size_t len = nmemb * size;
-  void *p = malloc(len);
-  if (p) memset(p, 0, len);
-  return p;
+  void *ret = malloc(len);
+  if (ret) memset(ret, 0, len);
+  return ret;
 }
 
 void *realloc(void *ptr, size_t size) {
   struct block *block = (struct block *) (((char *) ptr) - sizeof(size_t));
-  if (size < block->size) return ptr;  // We do a dumb malloc thing here.
+  size_t osize = block->size;
+  if (size < osize) return ptr;  // We do a dumb malloc thing here.
   void *p = malloc(size);
-  if (p != NULL) {
-    memcpy(p, ptr, size < block->size ? size : block->size);
-    free(ptr);
-  }
+  size_t less = size < osize ? size : osize;
+  memcpy(p, ptr, less);
+  free(ptr);
   return p;
 }

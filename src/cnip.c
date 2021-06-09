@@ -33,7 +33,6 @@ struct icmp {
   uint8_t type;
   uint8_t code;
   uint16_t csum;
-  uint16_t id;
 } __attribute__((packed));
 
 struct arp {
@@ -98,7 +97,7 @@ static void cnip_arp(struct cnip_if *ifp, struct eth *eth, struct arp *arp) {
     memcpy(arp->sha, ifp->mac, sizeof(arp->sha));
     arp->tpa = arp->spa;
     arp->spa = ifp->ip;
-    DEBUG("%s", "ARP req. tell them!\n");
+    DEBUG("%s", "ARP response\n");
     ifp->out(eth, sizeof(*eth) + sizeof(*arp));
   } else if (arp->op == NET16(2)) {
     // ARP response
@@ -111,15 +110,22 @@ static void cnip_arp(struct cnip_if *ifp, struct eth *eth, struct arp *arp) {
 
 static uint16_t ipcsum(const uint8_t *p, const uint8_t *end) {
   uint32_t sum = 0;
-  while (p < end) sum += (unsigned) ((((uint16_t) p[0]) << 8) | p[1]), p += 2;
+  while (p < end) sum += (unsigned) ((((uint16_t) p[1]) << 8) | p[0]), p += 2;
   while (sum >> 16) sum = (sum & 0xffff) + (sum >> 16);
-  return NET16((uint16_t) ~sum);
+  return ~sum & 0xffff;
 }
 
+#if 0
 static void set_ip_csum(struct ip *ip) {
   ip->csum = 0;
   ip->csum = ipcsum((uint8_t *) ip, (uint8_t *) (ip + 1));
 }
+
+static void set_icmp_csum(struct icmp *icmp) {
+  icmp->csum = 0;
+  icmp->csum = ipcsum((uint8_t *) icmp, (uint8_t *) (icmp + 1));
+}
+#endif
 
 static void cnip_icmp(struct cnip_if *ifp, struct eth *eth, struct ip *ip,
                       struct icmp *icmp, size_t len) {
@@ -128,10 +134,13 @@ static void cnip_icmp(struct cnip_if *ifp, struct eth *eth, struct ip *ip,
     memcpy(eth->src, ifp->mac, sizeof(eth->src));
     ip->dst = ip->src;
     ip->src = ifp->ip;
-    set_ip_csum(ip);
+    ip->csum = 0;  // Important - clear csum before recomputing
+    ip->csum = ipcsum((uint8_t *) ip, (uint8_t *) (ip + 1));
     icmp->type = 0;
+    icmp->csum = 0;  // Important - clear csum before recomputing
+    icmp->csum = ipcsum((uint8_t *) icmp, (uint8_t *) (icmp + 1) + len);
     size_t n = (size_t)((char *) (icmp + 1) - (char *) eth) + len;
-    DEBUG("ICMP %d\n", n);
+    DEBUG("ICMP response %d\n", n);
     ifp->out(eth, n);
   }
 }
@@ -141,6 +150,7 @@ static void cnip_ip(struct cnip_if *ifp, struct eth *eth, struct ip *ip,
   if (ip->proto == 1) {
     struct icmp *icmp = (struct icmp *) (ip + 1);
     if (len < sizeof(*icmp)) return;
+    DEBUG("ICMP %d\n", len);
     cnip_icmp(ifp, eth, ip, icmp, len - sizeof(*icmp));
   }
 }
@@ -152,12 +162,13 @@ void cnip_input(struct cnip_if *ifp, void *buf, size_t len) {
   if (eth->type == NET16(0x806)) {
     struct arp *arp = (struct arp *) (eth + 1);
     if (sizeof(*eth) + sizeof(*arp) > len) return;  // Truncated
+    DEBUG("ARP %d\n", len);
     cnip_arp(ifp, eth, arp);
-    // DEBUG("ARP %d\n", len);
   } else if (eth->type == NET16(0x800)) {
     struct ip *ip = (struct ip *) (eth + 1);
     if (len < sizeof(*eth) + sizeof(*ip)) return;  // Truncated packed
     if (ip->ver != 0x45) return;                   // Not IP
+    DEBUG("IP %d\n", len);
     cnip_ip(ifp, eth, ip, len - sizeof(*eth) - sizeof(*ip));
   }
 }
