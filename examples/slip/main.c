@@ -16,6 +16,7 @@ int main(void) {
   struct cnip_if netif = {.out = send_frame,
                           .mtu = 1600,
                           .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3},
+                          //.mac = {0xa4, 0x5e, 0x60, 0xb8, 0x65, 0x13},
                           .ip = 0x0700a8c0};
 
   struct slip slip = {.size = netif.mtu, .buf = malloc(netif.mtu)};

@@ -1,7 +1,7 @@
 PROG      ?= firmware
 ROOT_PATH ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 ARCH      ?= c3
-OBJ_PATH  = ./obj
+OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
 ESPTOOL   ?= esptool.py
 TOOLCHAIN ?= riscv32-esp-elf

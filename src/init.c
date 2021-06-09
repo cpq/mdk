@@ -49,6 +49,7 @@ void startup(void) {
 }
 
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
+#include <termios.h>
 char _sbss, _ebss, _end, _eram;
 static int s_uart = -1;
 static int open_serial(const char *name, int speed) {

@@ -20,6 +20,9 @@ static inline void wdt_disable(void) {
   RTC_CNTL_WDTCONFIG0_REG[0] &= BIT(31);     // Disable RTC WDT
   TIMG0_T0_WDTCONFIG0_REG[0] &= BIT(31);     // Disable task WDT
 }
+#elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
+static inline void wdt_disable(void) {
+}
 #else
 #error "Ouch"
 #endif

@@ -1,3 +1,39 @@
+#pragma once
+
+#if defined(ESP32C3)
+#define GPIO_FUNC_OUT_SEL_CFG_REG REG(0x60004554)
+#define GPIO_OUT_REG REG(0x60004004)
+#define GPIO_IN_REG REG(0x6000403c)
+#define GPIO_ENABLE_REG REG(0x60004020)
+
+static inline void gpio_output_enable(int pin, bool enable) {
+  GPIO_ENABLE_REG[0] &= ~BIT(pin);
+  GPIO_ENABLE_REG[0] |= (enable ? 1U : 0U) << pin;
+}
+
+static inline void gpio_output(int pin) {
+  GPIO_FUNC_OUT_SEL_CFG_REG[pin] = 128;  // Simple output, TRM 5.5.3
+  gpio_output_enable(pin, 1);
+}
+
+static inline void gpio_write(int pin, bool value) {
+  GPIO_OUT_REG[0] &= ~BIT(pin);                 // Clear first
+  GPIO_OUT_REG[0] |= (value ? 1U : 0U) << pin;  // Then set
+}
+
+static inline void gpio_toggle(int pin) {
+  GPIO_OUT_REG[0] ^= BIT(pin);
+}
+
+static inline void gpio_input(int pin) {
+  gpio_output_enable(pin, 0);  // Disable output
+}
+
+static inline bool gpio_read(int pin) {
+  return GPIO_IN_REG[0] & BIT(pin) ? 1 : 0;
+}
+
+#elif defined(ESP32)
 #define GPIO_FUNC_OUT_SEL_CFG_REG REG(0X3ff44530)  // Pins 0-39
 #define GPIO_FUNC_IN_SEL_CFG_REG REG(0X3ff44130)   // Pins 0-39
 #define GPIO_OUT_REG REG(0X3ff44004)               // Pins 0-31
@@ -49,3 +85,29 @@ static inline bool gpio_read(int pin) {
   if (pin > 31) pin -= 31, r = GPIO_IN1_REG;
   return r[0] & BIT(pin) ? 1 : 0;
 }
+#elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
+#include <stdio.h>
+#include <unistd.h>
+static inline void gpio_write(int pin, bool value) {
+  printf("%s %d %d\n", __func__, pin, value);
+}
+
+static inline bool gpio_read(int pin) {
+  printf("%s %d\n", __func__, pin);
+  return 0;
+}
+
+static inline void gpio_toggle(int pin) {
+  printf("%s %d\n", __func__, pin);
+}
+
+static inline void gpio_input(int pin) {
+  printf("%s %d\n", __func__, pin);
+}
+
+static inline void gpio_output(int pin) {
+  printf("%s %d\n", __func__, pin);
+}
+#else
+#error "Ouch"
+#endif

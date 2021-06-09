@@ -27,14 +27,8 @@ void sdk_vlog(char *fmt, va_list);
 int sdk_ram_used(void);
 int sdk_ram_free(void);
 
-#if defined(__unix) || defined(__unix__) || defined(__APPLE__)
-// Allow to build "firmwares" as unix binaries by emulating hardware API
-#include "unix.h"
-#else
+#include "cnip.h"
 #include "gpio.h"
+#include "spi.h"
 #include "uart.h"
 #include "wdt.h"
-#endif
-
-#include "cnip.h"
-#include "spi.h"

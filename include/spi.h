@@ -1,3 +1,6 @@
+#pragma once
+#include "gpio.h"
+
 struct spi {
   int miso, mosi, clk, cs[3];
 };
