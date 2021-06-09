@@ -1,5 +1,4 @@
 #include <sdk.h>
-
 #include "../../tools/slip.h"
 
 static void tx(unsigned char c, void *arg) {
@@ -18,17 +17,12 @@ int main(void) {
                           .mtu = 1600,
                           .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3},
                           .ip = 0x0700a8c0};
-  // sdk_log("%s\n", "hi from slip example");
-  // for (int i = 0;; i++)
-  // spin(999999), sdk_log("%p %d\n", malloc(256), sdk_ram_free());
-  // for (int i = 0;; i++) spin(999999), sdk_log("%p\n", malloc(1));
+
   struct slip slip = {.size = netif.mtu, .buf = malloc(netif.mtu)};
-  sdk_log("%s\n", "hi from slip example");
   sdk_log("Allocated %d bytes @ %p for netif frame\n", netif.mtu, slip.buf);
 
   bool got_ipaddr = netif.ip != 0;
   unsigned long uptime_ms = 0;  // Pretend we know what time it is
-
   for (;;) {
     uint8_t c;
     if (uart_rx(&c) == 0) {
