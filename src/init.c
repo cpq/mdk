@@ -59,19 +59,16 @@ void startup(void) {
 char _sbss, _ebss, _end, _eram;
 static int s_uart = -1;
 
-static int open_serial(const char *name, int speed) {
+static int open_serial(const char *name, int baud) {
   int fd = open(name, O_RDWR | O_NONBLOCK);
   struct termios tio;
   if (fd >= 0 && tcgetattr(fd, &tio) == 0) {
-    cfsetospeed(&tio, (speed_t) speed);
-    cfsetispeed(&tio, (speed_t) speed);
-    tio.c_cflag = CS8 | CREAD | CLOCAL | PARENB;
-    tio.c_lflag = 0;
-    tio.c_oflag = 0;
-    tio.c_iflag = 0;  // IGNBRK | IGNPAR | IGNCR;
+    tio.c_ispeed = tio.c_ospeed = (speed_t) baud;
+    tio.c_cflag = CS8 | CREAD | CLOCAL;
+    tio.c_lflag = tio.c_oflag = tio.c_iflag = 0;
     tcsetattr(fd, TCSANOW, &tio);
   }
-  printf("Opened %s @ %d\n", name, speed);
+  printf("Opened %s @ %d\n", name, baud);
   return fd;
 }
 static const char *s_serial_dev = "/dev/ptyp3";

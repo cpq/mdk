@@ -5,7 +5,6 @@ OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
 ESPTOOL   ?= esptool.py
 TOOLCHAIN ?= riscv32-esp-elf
-SLIPTERM  ?= $(ROOT_PATH)/tools/slipterm
 
 # -g3 pulls enums and defines into the debug info for GDB
 # -ffunction-sections -fdata-sections, -Wl,--gc-sections remove unused code
@@ -21,8 +20,12 @@ LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld -nostdlib -nostartfiles #-
 ifeq "$(ARCH)" "c3"
 MCUFLAGS  ?= -march=rv32imc -mabi=ilp32 -DESP32C3
 WARNFLAGS ?= -Wformat-truncation
+BLOFFSET  ?= 0
+CHIP      ?= esp32c3
 else 
 MCUFLAGS  ?= -mlongcalls -mtext-section-literals -DESP32
+BLOFFSET  ?= 0x1000
+CHIP      ?= esp32
 endif
 
 SOURCES += $(ROOT_PATH)/boot/boot_$(ARCH).s
@@ -33,9 +36,10 @@ build: $(OBJ_PATH)/$(PROG).bin
 
 unix: MCUFLAGS =
 unix: OPTFLAGS = -O0 -g3
+unix: SRCS = $(filter-out %.s,$(filter-out $(ROOT_PATH)/src/malloc.c,$(SOURCES)))
 unix: $(SOURCES)
 	@mkdir -p $(OBJ_PATH)
-	$(CC) $(CFLAGS) $(filter-out $(ROOT_PATH)/src/malloc.c,$(SOURCES)) -o $(OBJ_PATH)/firmware
+	$(CC) $(CFLAGS) $(SRCS) -o $(OBJ_PATH)/firmware
 
 $(OBJ_PATH)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -50,11 +54,11 @@ $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
 	$(TOOLCHAIN)-size $@
 
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
-	$(ESPTOOL) --chip esp32c3 elf2image -o $@ $<
+	$(ESPTOOL) --chip $(CHIP) elf2image -o $@ $<
 
 flash: $(OBJ_PATH)/$(PROG).bin
-	$(ESPTOOL) --chip esp32c3 --port $(PORT) --baud 115200 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
-    0x00000 $(ROOT_PATH)/boot/bootloader_$(ARCH).bin \
+	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud 115200 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
+    $(BLOFFSET) $(ROOT_PATH)/boot/bootloader_$(ARCH).bin \
     0x08000 $(ROOT_PATH)/boot/partitions.bin \
     0x10000 $?
 

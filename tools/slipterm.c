@@ -38,7 +38,7 @@ static int open_serial(const char *name, int baud) {
   int fd = open(name, O_RDWR);
   struct termios tio;
   if (fd >= 0 && tcgetattr(fd, &tio) == 0) {
-    tio.c_ispeed = tio.c_ospeed = baud;  // Input speed = output speed = baud
+    tio.c_ispeed = tio.c_ospeed = baud;
     tio.c_cflag = CS8 | CREAD | CLOCAL;
     tio.c_lflag = tio.c_oflag = tio.c_iflag = 0;
     tcsetattr(fd, TCSANOW, &tio);
@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
       struct pcap_pkthdr *hdr = NULL;
       const unsigned char *pkt = NULL;
       if (pcap_next_ex(ph, &hdr, &pkt) != 1) continue;  // Yea, fetch packet
-      slip_send(pkt, hdr->len, uart_tx, &uart_fd);  // Forward to serial
+      slip_send(pkt, hdr->len, uart_tx, &uart_fd);      // Forward to serial
     }
 
     // Maybe a device has sent us something
