@@ -13,14 +13,13 @@ static void send_frame(const void *buf, size_t len) {
 int main(void) {
   wdt_disable();  // Shut up our friend for now
 
-  struct cnip_if netif = {.out = send_frame,
-                          .mtu = 1600,
-                          .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3},
-                          //.mac = {0xa4, 0x5e, 0x60, 0xb8, 0x65, 0x13},
-                          .ip = 0x0700a8c0};
+  struct net_if netif = {.out = send_frame,
+                         .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3},
+                         //.mac = {0xa4, 0x5e, 0x60, 0xb8, 0x65, 0x13},
+                         .ip = 0x0700a8c0};
 
-  struct slip slip = {.size = netif.mtu, .buf = malloc(netif.mtu)};
-  sdk_log("Allocated %d bytes @ %p for netif frame\n", netif.mtu, slip.buf);
+  struct slip slip = {.size = 1536, .buf = malloc(slip.size)};
+  sdk_log("Allocated %d bytes @ %p for netif frame\n", slip.size, slip.buf);
 
   bool got_ipaddr = netif.ip != 0;
   unsigned long uptime_ms = 0;  // Pretend we know what time it is
@@ -28,10 +27,10 @@ int main(void) {
     uint8_t c;
     if (uart_rx(&c) == 0) {
       size_t len = slip_recv(c, &slip);
-      if (len > 0) cnip_input(&netif, slip.buf, len);
+      if (len > 0) net_input(&netif, slip.buf, slip.size, len);
       if (len == 0 && slip.mode == 0) sdk_log("%c", c);
     }
-    cnip_poll(&netif, uptime_ms++);  // Let IP stack process things
+    net_poll(&netif, uptime_ms++);  // Let IP stack process things
     if (got_ipaddr == false && netif.ip != 0) {
       sdk_log("ip %x, mask %x, gw %x\n", netif.ip, netif.mask, netif.gw);
       got_ipaddr = true;

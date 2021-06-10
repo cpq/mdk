@@ -1,3 +1,6 @@
+// Copyright (c) 2021 Cesanta
+// All rights reserved
+
 #pragma once
 
 #if defined(ESP32C3)

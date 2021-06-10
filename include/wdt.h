@@ -1,3 +1,6 @@
+// Copyright (c) 2021 Cesanta
+// All rights reserved
+
 #if defined(ESP32C3)
 #define RTC_CNTL_WDTCONFIG0_REG REG(0x60008090)
 #define RTC_CNTL_WDTWPROTECT_REG REG(0x600080a8)

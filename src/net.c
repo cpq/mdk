@@ -1,10 +1,11 @@
-// Copyright (c) 2012-2021 Charles Lohr, MIT license
+// Copyright (c) 2021 Cesanta
 // All rights reserved
 
-#include <cnip.h>
+#include <string.h>
+#include "net.h"
 
 #if 1
-#include <sdk.h>
+#include "log.h"
 #define DEBUG(fmt, ...) sdk_log(fmt, __VA_ARGS__)
 #else
 #define DEBUG(fmt, ...)
@@ -87,7 +88,7 @@ struct arp_entry {
 static struct arp_entry s_arp_cache[CNIP_ARP_CACHE_SIZE];  // ARP cache
 static size_t s_arp_idx;                                   // Current ARP index
 
-static void cnip_arp(struct cnip_if *ifp, struct eth *eth, struct arp *arp) {
+static void net_arp(struct net_if *ifp, struct eth *eth, struct arp *arp) {
   if (arp->op == NET16(1) && arp->tpa == ifp->ip) {
     // ARP request. Edit packet in-place. Make a response, then send
     memcpy(eth->dst, eth->src, sizeof(eth->dst));
@@ -115,20 +116,8 @@ static uint16_t ipcsum(const uint8_t *p, const uint8_t *end) {
   return ~sum & 0xffff;
 }
 
-#if 0
-static void set_ip_csum(struct ip *ip) {
-  ip->csum = 0;
-  ip->csum = ipcsum((uint8_t *) ip, (uint8_t *) (ip + 1));
-}
-
-static void set_icmp_csum(struct icmp *icmp) {
-  icmp->csum = 0;
-  icmp->csum = ipcsum((uint8_t *) icmp, (uint8_t *) (icmp + 1));
-}
-#endif
-
-static void cnip_icmp(struct cnip_if *ifp, struct eth *eth, struct ip *ip,
-                      struct icmp *icmp, size_t len) {
+static void net_icmp(struct net_if *ifp, struct eth *eth, struct ip *ip,
+                     struct icmp *icmp, size_t len) {
   if (icmp->type == 8) {
     memcpy(eth->dst, eth->src, sizeof(eth->dst));
     memcpy(eth->src, ifp->mac, sizeof(eth->src));
@@ -145,17 +134,17 @@ static void cnip_icmp(struct cnip_if *ifp, struct eth *eth, struct ip *ip,
   }
 }
 
-static void cnip_ip(struct cnip_if *ifp, struct eth *eth, struct ip *ip,
-                    size_t len) {
+static void net_ip(struct net_if *ifp, struct eth *eth, struct ip *ip,
+                   size_t len) {
   if (ip->proto == 1) {
     struct icmp *icmp = (struct icmp *) (ip + 1);
     if (len < sizeof(*icmp)) return;
     DEBUG("ICMP %d\n", len);
-    cnip_icmp(ifp, eth, ip, icmp, len - sizeof(*icmp));
+    net_icmp(ifp, eth, ip, icmp, len - sizeof(*icmp));
   }
 }
 
-void cnip_input(struct cnip_if *ifp, void *buf, size_t len) {
+void net_input(struct net_if *ifp, void *buf, size_t mtu, size_t len) {
   // DEBUG("got frame %u bytes\n", len);
   struct eth *eth = buf;
   if (len < sizeof(*eth)) return;  // Truncated packet - runt?
@@ -163,17 +152,18 @@ void cnip_input(struct cnip_if *ifp, void *buf, size_t len) {
     struct arp *arp = (struct arp *) (eth + 1);
     if (sizeof(*eth) + sizeof(*arp) > len) return;  // Truncated
     DEBUG("ARP %d\n", len);
-    cnip_arp(ifp, eth, arp);
+    net_arp(ifp, eth, arp);
   } else if (eth->type == NET16(0x800)) {
     struct ip *ip = (struct ip *) (eth + 1);
     if (len < sizeof(*eth) + sizeof(*ip)) return;  // Truncated packed
     if (ip->ver != 0x45) return;                   // Not IP
     DEBUG("IP %d\n", len);
-    cnip_ip(ifp, eth, ip, len - sizeof(*eth) - sizeof(*ip));
+    net_ip(ifp, eth, ip, len - sizeof(*eth) - sizeof(*ip));
   }
+  (void) mtu;
 }
 
-void cnip_poll(struct cnip_if *ifp, unsigned long now_ms) {
+void net_poll(struct net_if *ifp, unsigned long now_ms) {
   (void) ifp;
   (void) now_ms;
 }

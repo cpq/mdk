@@ -1,3 +1,6 @@
+// Copyright (c) 2021 Cesanta
+// All rights reserved
+
 #include <sdk.h>
 
 extern int main(void);
@@ -49,9 +52,13 @@ void startup(void) {
 }
 
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
+#include <fcntl.h>
 #include <termios.h>
+#include <unistd.h>
+
 char _sbss, _ebss, _end, _eram;
 static int s_uart = -1;
+
 static int open_serial(const char *name, int speed) {
   int fd = open(name, O_RDWR | O_NONBLOCK);
   struct termios tio;

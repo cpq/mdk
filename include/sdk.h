@@ -12,23 +12,16 @@
 #include <string.h>
 
 #define BIT(x) (1UL << (x))
-#define REG(x) ((volatile unsigned long *) (x))
+#define REG(x) ((volatile uint32_t *) (x))
 
 #ifndef LED1
 #define LED1 2  // Default LED pin
 #endif
 
-static inline void spin(volatile unsigned long count) {
-  while (count--) asm volatile("nop");
-}
-
-void sdk_log(char *fmt, ...);
-void sdk_vlog(char *fmt, va_list);
-int sdk_ram_used(void);
-int sdk_ram_free(void);
-
-#include "cnip.h"
 #include "gpio.h"
+#include "log.h"
+#include "net.h"
 #include "spi.h"
 #include "uart.h"
+#include "util.h"
 #include "wdt.h"

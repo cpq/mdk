@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../src/cnip.c"
+#include "../src/net.c"
 
 int main(void) {
   uint8_t hdr[] = {0x45, 0, 0,    0x54, 0x4, 0x4b, 0,    0,    0x40, 1,
