@@ -15,7 +15,7 @@ INCLUDES  ?= -I. -I$(ROOT_PATH)/include
 WARNFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
 OPTFLAGS  ?= -O3 -g3 -ffunction-sections -fdata-sections
 CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(PROJFLAGS) $(CFLAGS_EXTRA)
-LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld -nostdlib -nostartfiles #--gc-sections
+LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections
 
 ifeq "$(ARCH)" "c3"
 MCUFLAGS  ?= -march=rv32imc -mabi=ilp32 -DESP32C3
@@ -41,7 +41,7 @@ unix: $(SOURCES)
 	@mkdir -p $(OBJ_PATH)
 	$(CC) $(CFLAGS) $(SRCS) -o $(OBJ_PATH)/firmware
 
-$(OBJ_PATH)/%.o: %.c
+$(OBJ_PATH)/%.o: %.c $(wildcard $(ROOT_PATH)/include/%.h)
 	@mkdir -p $(dir $@)
 	$(TOOLCHAIN)-gcc $(CFLAGS) -c $< -o $@
 

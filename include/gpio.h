@@ -8,6 +8,7 @@
 #define GPIO_OUT_REG REG(0x60004004)
 #define GPIO_IN_REG REG(0x6000403c)
 #define GPIO_ENABLE_REG REG(0x60004020)
+#define GPIO_MUX_REG REG(0x60009004)
 
 static inline void gpio_output_enable(int pin, bool enable) {
   GPIO_ENABLE_REG[0] &= ~BIT(pin);
@@ -29,7 +30,8 @@ static inline void gpio_toggle(int pin) {
 }
 
 static inline void gpio_input(int pin) {
-  gpio_output_enable(pin, 0);  // Disable output
+  gpio_output_enable(pin, 0);   // Disable output
+  GPIO_MUX_REG[pin] = BIT(9) | BIT(8);  // Enable pull-up
 }
 
 static inline bool gpio_read(int pin) {

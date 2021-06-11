@@ -18,6 +18,10 @@
 #define LED1 2  // Default LED pin
 #endif
 
+#ifndef BTN1
+#define BTN1 9  // Default user button pin
+#endif
+
 #include "gpio.h"
 #include "log.h"
 #include "net.h"
