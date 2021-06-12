@@ -53,7 +53,7 @@ static int open_serial(const char *name, int baud) {
   return fd;
 }
 
-static int open_master_pty(void) {
+static int open_pty(void) {
   char buf[100];
   int fd = -1, x = -1;
   openpty(&fd, &x, buf, NULL, NULL);
@@ -104,7 +104,8 @@ static void uart_tx(unsigned char byte, void *arg) {
 
 int main(int argc, char **argv) {
   const char *baud = "115200";
-  const char *port = "/dev/ttyUSB0";  // Serial iface
+  const char *port = "/dev/ttyUSB0";  // ESP device serial port
+  const char *tty = NULL;             // Modem serial port
   const char *iface = NULL;           // Network iface
   const char *bpf = NULL;  // "host x.x.x.x or ether host ff:ff:ff:ff:ff:ff";
   int verbose = 0, pppd = 0;
@@ -119,7 +120,9 @@ int main(int argc, char **argv) {
       bpf = argv[++i];
     } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
       port = argv[++i];
-    } else if (strcmp(argv[i], "-t") == 0) {
+    } else if (strcmp(argv[i], "-t") == 0 && i + 1 < argc) {
+      port = argv[++i];
+    } else if (strcmp(argv[i], "-P") == 0) {
       pppd++;
     } else if (strcmp(argv[i], "-v") == 0) {
       verbose++;
@@ -127,11 +130,12 @@ int main(int argc, char **argv) {
       return fail(
           "slipterm version %s\n"
           "Usage: %s [OPTIONS]\n"
+          "  -P\t\t - enable pppd mode. Default: disabled\n"
           "  -i NETIF\t - network iface, e.g. en0, eth0. Default: NULL\n"
           "  -f FILTER\t - BPF filter. Default: NULL\n"
           "  -b BAUD\t - serial speed. Default: %s\n"
-          "  -p PORT\t - serial device. Default: %s\n"
-          "  -t\t\t - enable pppd mode. Default: disabled\n"
+          "  -p PORT\t - ESP serial port. Default: %s\n"
+          "  -t PORT\t - modem serial port. Default: NULL\n"
           "  -v\t\t - be verbose, hexdump SLIP packets. Default: false\n"
           "",
           SLIPTERM_VERSION, argv[0], baud, port);
@@ -144,7 +148,7 @@ int main(int argc, char **argv) {
     char errbuf[PCAP_ERRBUF_SIZE] = "";
     ph = pcap_open_live(iface, 0xffff, 1, 1, errbuf);
     if (ph == NULL) fail("pcap_open_live: %s\n", errbuf);
-    pcap_setnonblock(ph, 1, errbuf);
+    // pcap_setnonblock(ph, 1, errbuf);
 
     // Apply BPF to reduce noise. Let in only broadcasts and our own traffic
     if (bpf != NULL) {
@@ -158,7 +162,7 @@ int main(int argc, char **argv) {
   }
 
   // Ok here are 3 sources we're going to listen on
-  int tty_fd = pppd ? open_master_pty() : -1;
+  int tty_fd = pppd ? open_pty() : tty ? open_serial(tty, atoi(baud)) : -1;
   int uart_fd = open_serial(port, atoi(baud));
   int stdin_fd = 0;  // Keep in canonical mode to allow Ctrl-C
   int pcap_fd = ph ? pcap_get_selectable_fd(ph) : -1;
