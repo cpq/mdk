@@ -138,9 +138,8 @@ int main(int argc, char **argv) {
   pcap_t *ph = NULL;
   if (iface != NULL) {
     char errbuf[PCAP_ERRBUF_SIZE] = "";
-    pcap_t *ph = pcap_open_live(iface, 0xffff, 1, 1, errbuf);
+    ph = pcap_open_live(iface, 0xffff, 1, 1, errbuf);
     if (ph == NULL) fail("pcap_open_live: %s\n", errbuf);
-    printf("Opened %s in live mode\n", iface);
     pcap_setnonblock(ph, 1, errbuf);
 
     // Apply BPF to reduce noise. Let in only broadcasts and our own traffic
@@ -150,6 +149,8 @@ int main(int argc, char **argv) {
       pcap_setfilter(ph, &bpfp);
       pcap_freecode(&bpfp);
     }
+
+    printf("Opened %s in live mode fd=%d\n", iface, pcap_get_selectable_fd(ph));
   }
 
   // Ok here are 3 sources we're going to listen on
@@ -214,7 +215,7 @@ int main(int argc, char **argv) {
       slip_send(pkt, hdr->len, uart_tx, &uart_fd);      // Forward to serial
     }
 
-    // Maybe there is something on the network?
+    // Maybe there is something on the pty?
     if (tty_fd >= 0 && FD_ISSET(tty_fd, &rset)) {
       uint8_t buf[BUFSIZ];
       int len = read(tty_fd, buf, sizeof(buf));
