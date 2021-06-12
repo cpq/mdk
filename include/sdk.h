@@ -26,6 +26,7 @@
 #include "log.h"
 #include "net.h"
 #include "spi.h"
+#include "timer.h"
 #include "uart.h"
 #include "util.h"
 #include "wdt.h"

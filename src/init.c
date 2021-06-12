@@ -51,6 +51,12 @@ static void clock_init(void) {
   SYSTEM_SYSCLK_CONF_REG[0] |= 1U << 10;
   SYSTEM_CPU_PER_CONF_REG[0] &= 3U;
   SYSTEM_CPU_PER_CONF_REG[0] |= BIT(2) | BIT(0);
+
+  // Configure system clock timer, TRM 8.3.1, 8.9
+  TIMG0_REG[1] = TIMG0_REG[2] = 0UL;  // Reset LO and HI counter
+  TIMG0_REG[8] = 0;                   // Trigger reload
+                                      // autoreload, increase, enable,  use xtal
+  TIMG0_REG[0] = BIT(9) | BIT(13) | BIT(29) | BIT(30) | BIT(31);
 #endif
 }
 
