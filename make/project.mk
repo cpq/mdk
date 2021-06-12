@@ -30,6 +30,7 @@ endif
 
 # Most chips don't need a specific rev.
 CHIP_REV?=
+FLASH_BAUD?=115200
 
 SOURCES += $(ROOT_PATH)/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
@@ -60,7 +61,7 @@ $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 	$(ESPTOOL) --chip $(CHIP) elf2image -o $@ $<
 
 flash: $(OBJ_PATH)/$(PROG).bin
-	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud 115200 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
+	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
     $(BLOFFSET) $(ROOT_PATH)/boot/bootloader_$(ARCH)$(CHIP_REV).bin \
     0x08000 $(ROOT_PATH)/boot/partitions.bin \
     0x10000 $?
