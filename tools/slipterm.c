@@ -17,7 +17,11 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#if defined(__APPLE__)
 #include <util.h>
+#elif defined(__linux__)
+#include <pty.h>
+#endif
 
 #include "slip.h"  // SLIP state machine logic
 
@@ -192,7 +196,8 @@ int main(int argc, char **argv) {
         if (len <= 0) continue;
         if (verbose) dump("DEV > NET", slip.buf, len);
         if (tty_fd >= 0) {
-          write(tty_fd, slip.buf, len);
+          int n = write(tty_fd, slip.buf, len);
+          if (n != (int) len) fail("tty_fd write %d %s\n", n, strerror(errno));
         } else if (ph != NULL) {
           pcap_inject(ph, slip.buf, len);  // Forward to network
         }
