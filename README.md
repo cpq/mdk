@@ -6,8 +6,20 @@ Main source of inspiration is ESP32 TRM:
 
 # Environment setup
 
-Required tools: esptool and GCC. Install ESP-IDF and export the following
-environment variables:
+Required tools: esptool and GCC. Install ESP-IDF.
+
+If all of your installs are inthe default locations, you can simply use the
+built-in `export.sh` located in `tools`.
+
+```sh
+$ . tools/export.sh c3 r0
+```
+
+for example, where c3 is the chip type, and r0 is the chip rev, chip rev is
+optional.
+
+Alternatively, you can manually setup the environment by exporting the
+following environment variables:
 
 ```sh
 $ export TOOLCHAIN=riscv32-esp-elf      # $TOOLCHAIN-gcc must resolve to GCC
