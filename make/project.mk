@@ -29,7 +29,7 @@ CHIP      ?= esp32
 endif
 
 # Most chips don't need a specific rev.
-SPECIFIC_REV?=
+CHIP_REV?=
 
 SOURCES += $(ROOT_PATH)/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
@@ -61,7 +61,7 @@ $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 
 flash: $(OBJ_PATH)/$(PROG).bin
 	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud 115200 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
-    $(BLOFFSET) $(ROOT_PATH)/boot/bootloader_$(ARCH)$(SPECIFIC_REV).bin \
+    $(BLOFFSET) $(ROOT_PATH)/boot/bootloader_$(ARCH)$(CHIP_REV).bin \
     0x08000 $(ROOT_PATH)/boot/partitions.bin \
     0x10000 $?
 
