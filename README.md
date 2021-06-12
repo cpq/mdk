@@ -9,8 +9,15 @@ Main source of inspiration is ESP32 TRM:
 Required tools:
 - Esptool. Download from [esptool.py](https://raw.githubusercontent.com/espressif/esptool/master/esptool.py)
 - GCC crosscompiler for riscv 32-bit:
-   - MacOS (takes time): `brew tap riscv/riscv ; brew install riscv-gnu-toolchain --with-multilib`
-   - Linux: ?
+   - MacOS (takes time):
+      ```sh
+      $ brew tap riscv/riscv
+      $ brew install riscv-gnu-toolchain --with-multilib
+      ```
+   - Linux:
+      ```sh
+      $ sudo apt-get install -y gcc-riscv64-linux-gnu
+      ```
 
 If all of your installs are inthe default locations, you can simply use the
 built-in `export.sh` located in `tools`.
