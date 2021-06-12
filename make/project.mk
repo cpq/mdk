@@ -4,7 +4,7 @@ ARCH      ?= c3
 OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
 ESPTOOL   ?= esptool.py
-TOOLCHAIN ?= riscv32-esp-elf
+TOOLCHAIN ?= riscv64-unknown-elf
 
 # -g3 pulls enums and defines into the debug info for GDB
 # -ffunction-sections -fdata-sections, -Wl,--gc-sections remove unused code

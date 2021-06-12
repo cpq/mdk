@@ -6,7 +6,11 @@ Main source of inspiration is ESP32 TRM:
 
 # Environment setup
 
-Required tools: esptool and GCC. Install ESP-IDF.
+Required tools:
+- Esptool. Download from [esptool.py](https://raw.githubusercontent.com/espressif/esptool/master/esptool.py)
+- GCC crosscompiler for riscv 32-bit:
+   - MacOS (takes time): `brew tap riscv/riscv ; brew install riscv-gnu-toolchain --with-multilib`
+   - Linux: ?
 
 If all of your installs are inthe default locations, you can simply use the
 built-in `export.sh` located in `tools`.
@@ -22,11 +26,10 @@ Alternatively, you can manually setup the environment by exporting the
 following environment variables:
 
 ```sh
-$ export TOOLCHAIN=riscv32-esp-elf      # $TOOLCHAIN-gcc must resolve to GCC
 $ export ARCH=c3                        # Choices: c3, esp32
+$ export TOOLCHAIN=riscv64-unknown-elf  # $TOOLCHAIN-gcc must resolve to GCC
 $ export ESPTOOL=/path/to/esptool.py    # Full path to esptool.py
 $ export PORT=/dev/ttyUSB0              # Serial port for flashing
-$ export PATH=$PATH:$(dirname $(find ~/.espressif -type f -name $TOOLCHAIN-gcc))
 ```
 
 Verify setup by running GCC:
