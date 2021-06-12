@@ -13,7 +13,7 @@ TOOLCHAIN ?= riscv32-esp-elf
 DEFS      ?=
 INCLUDES  ?= -I. -I$(ROOT_PATH)/include
 WARNFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
-OPTFLAGS  ?= -O3 -g3 -ffunction-sections -fdata-sections
+OPTFLAGS  ?= -Os -g3 -ffunction-sections -fdata-sections
 CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(PROJFLAGS) $(CFLAGS_EXTRA)
 LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections
 
