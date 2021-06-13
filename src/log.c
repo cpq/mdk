@@ -1,10 +1,7 @@
-#include <limits.h>
-#include <stdarg.h>
-#include <string.h>
+#include <sdk.h>
 
 static void logc(int c) {
-  extern int uart_tx_one_char(unsigned char);
-  uart_tx_one_char((unsigned char) c);
+  uart_tx((unsigned char) c);
 }
 
 static void logx(unsigned long v) {
@@ -75,7 +72,7 @@ void sdk_vlog(const char *fmt, va_list ap) {
   }
 }
 
-void sdk_log(char *fmt, ...) {
+void sdk_log(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   sdk_vlog(fmt, ap);

@@ -55,54 +55,22 @@ static void clock_init(void) {
   // Configure system clock timer, TRM 8.3.1, 8.9
   TIMG0_REG[1] = TIMG0_REG[2] = 0UL;  // Reset LO and HI counter
   TIMG0_REG[8] = 0;                   // Trigger reload
-                                      // autoreload, increase, enable,  use xtal
-  TIMG0_REG[0] = BIT(9) | BIT(13) | BIT(29) | BIT(30) | BIT(31);
+  // TIMG0_REG[0] = 0;                                       // Disable first
+  // TIMG0_REG[0] |= (83U << 13);                            // Set the divider
+  // TIMG0_REG[0] |= BIT(12) | BIT(29) | BIT(30) | BIT(31);  // Reset
+  TIMG0_REG[0] = (83U << 13) | BIT(12) | BIT(29) | BIT(30) | BIT(31);
 #endif
 }
 
 // Initialise memory and other low level stuff, and call main()
 void startup(void) {
-  extern char _sbss, _ebss;
+#if defined(__unix) || defined(__unix__) || defined(__APPLE__)
+  char _sbss, _ebss, _end, _eram;
+#else
+  extern char _sbss, _ebss, _end, _eram;
+#endif
   for (char *p = &_sbss; p < &_ebss;) *p++ = '\0';
-  extern char _end, _eram;
   sdk_heap_init(&_end, &_eram);
   clock_init();
   main();
 }
-
-#if defined(__unix) || defined(__unix__) || defined(__APPLE__)
-#include <errno.h>
-#include <fcntl.h>
-#include <termios.h>
-#include <unistd.h>
-
-char _sbss, _ebss, _end, _eram;
-static int s_uart = -1;
-static const char *s_serial_port = "/dev/ptyp3";
-
-static int open_serial(const char *name, int baud) {
-  int fd = open(name, O_RDWR | O_NONBLOCK);
-  struct termios tio;
-  if (fd >= 0 && tcgetattr(fd, &tio) == 0) {
-    tio.c_ispeed = tio.c_ospeed = (speed_t) baud;
-    tio.c_cflag = CS8 | CREAD | CLOCAL;
-    tio.c_lflag = tio.c_oflag = tio.c_iflag = 0;
-    tcsetattr(fd, TCSANOW, &tio);
-  }
-  printf("Opened %s @ %d, fd %d (%s)\n", name, baud, fd, strerror(errno));
-  return fd;
-}
-int uart_tx(uint8_t ch) {
-  if (s_uart < 0) s_uart = open_serial(s_serial_port, 115200);
-  while (write(s_uart, &ch, 1) != 1) (void) 0;
-  return 0;
-}
-int uart_rx(uint8_t *ch) {
-  if (s_uart < 0) s_uart = open_serial(s_serial_port, 115200);
-  return read(s_uart, ch, 1) == 1 ? 0 : -1;
-}
-int uart_tx_one_char(uint8_t ch) {
-  // return uart_tx(ch);
-  return write(1, &ch, 1) > 0 ? 0 : -1;
-}
-#endif
