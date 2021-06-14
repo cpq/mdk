@@ -1,75 +1,44 @@
 #include <sdk.h>
-#include "../../tools/slip.h"
+#include "cell.h"
 
-struct ppp {
-  int state;  // dead, setup, auth, run, close
-};
+int tx = 3, rx = 2, rst = 0, baud = 115200, bufsize = 2048;
 
-#if 0
-struct lcp {
-  uint8_t code;
-  uint8_t id;
-  uint16_t len;
-} __attribute__((packed));
-
-static inline void tx(const void *ptr, size_t len) {
-  uart_tx(0x7e);
-  for (size_t i = 0; i < len; i++) uart_tx(((uint8_t *) ptr)[i]);
-  uart_tx(0x7e);
-}
-#endif
-
-static void tx(unsigned char c, void *arg) {
-  uart_tx(c);
-  (void) arg;
-}
-
-static void send_frame(const void *buf, size_t len) {
-  slip_send(buf, len, tx, NULL);
-}
-
-static inline void handle_ppp(uint8_t *buf, size_t len) {
-  sdk_log("PPP: ");
-  for (size_t i = 0; i < len; i++) sdk_log("%d ", buf[i]);
-  sdk_log("\n");
-}
-
-static inline void blink(void) {
-  gpio_write(LED1, 1);
-  delay_ms(10);
-  gpio_write(LED1, 0);
+static void txfn(const void *buf, int len) {
+  const uint8_t *p = buf;
+  while (len-- > 0) uart_tx_pin(tx, baud, *p++);
 }
 
 int main(void) {
-  wdt_disable();  // Shut up our friend for now
+  wdt_disable();
+
   gpio_output(LED1);
-
-  struct net_if netif = {.out = send_frame,
-                         .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3},
-                         .ip = 0x0700a8c0};
-
-  struct slip slip = {.size = 1536, .buf = malloc(slip.size)};
-  sdk_log("Allocated %d bytes @ %p for netif frame\n", slip.size, slip.buf);
-
-  bool got_ipaddr = netif.ip != 0;
-  unsigned long uptime_ms = 0;  // Pretend we know what time it is
-
   gpio_input(BTN1);
+
+  gpio_output(tx);
+  gpio_output(rst);
+  gpio_input(rx);
+
+  // Allocate serial input buffer and cellular modem context
+  char *buf = malloc((size_t) bufsize);
+  const char *cmds[] = {
+      "ATZ",          "ATE0",    "AT+CFUN=0",
+      "ATH",          "ATI",     "AT+GSN",
+      "AT+CIMI",      "AT+CCID", "AT+CREG=0",
+      "AT+CREG?",     "AT+CSQ",  "AT+CGDCONT=1,\"IP\",\"isp.vodafone.ie\"",
+      "ATDT*99***1#", NULL};
+  struct cell cell = {.buf = buf, .size = bufsize, .tx = txfn, .cmds = cmds};
+
   for (;;) {
     uint8_t c;
-    if (uart_rx(&c) == 0) {
-      size_t len = slip_recv(c, &slip);
-      if (len > 0) net_input(&netif, slip.buf, slip.size, len);
-      if (len == 0 && slip.mode == 0) sdk_log("%c", c);
-      // blink();
-    }
-    // if (gpio_read(BTN1) == false) slip_send("\x7ehi\x7e", 4, tx, NULL);
-    net_poll(&netif, uptime_ms++);  // Let IP stack process things
-    if (got_ipaddr == false && netif.ip != 0) {
-      sdk_log("ip %x, mask %x, gw %x\n", netif.ip, netif.mask, netif.gw);
-      got_ipaddr = true;
-    }
+    if (uart_rx(&c) == 0) uart_tx_pin(tx, baud, c);
+    if (uart_rx_pin(rx, baud, &c) == 0) cell_rx(&cell, c);
+    // if (uart_rx_pin(rx, baud, &c) == 0) uart_tx(c);
+
+    cell_poll(&cell, time_us() / 1000);
+
+    if (gpio_read(BTN1) == 0)
+      gpio_write(rst, 0), delay_ms(10), gpio_write(rst, 1);
   }
 
-  return 0;  // Unreached
+  return 0;
 }
