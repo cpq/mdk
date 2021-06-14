@@ -1,8 +1,8 @@
 // Copyright (c) 2021 Cesanta
 // All rights reserved
 
+#include "tcpip.h"
 #include <string.h>
-#include "net.h"
 
 #if 1
 #include "log.h"

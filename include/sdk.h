@@ -15,7 +15,7 @@
 #define REG(x) ((volatile uint32_t *) (x))
 
 #ifndef LED1
-#define LED1 2  // Default LED pin
+#define LED1 1  // Default LED pin
 #endif
 
 #ifndef BTN1
@@ -24,9 +24,9 @@
 
 #include "gpio.h"
 #include "log.h"
-#include "net.h"
 #include "spi.h"
 #include "sys.h"
+#include "tcpip.h"
 #include "timer.h"
 #include "uart.h"
 #include "wdt.h"
