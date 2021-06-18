@@ -22,10 +22,10 @@ int main(void) {
   for (;;) {
     uint8_t c = 0;
     if (uart_read(1, &c)) cell_rx(&cell, c);
-    if (uart_read(0, &c)) uart_write(1, c);
-    if (uart_read(1, &c)) uart_write(0, c);
+    // if (uart_read(0, &c)) uart_write(1, c);
+    // if (uart_read(1, &c)) uart_write(0, c);
 
-    // cell_poll(&cell, time_us() / 1000);
+    cell_poll(&cell, time_us() / 1000);
   }
 
   return 0;
