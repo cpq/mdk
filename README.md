@@ -1,8 +1,9 @@
 # ESP32 SDK
 
 This is an alternative, make-based, bare metal SDK for the ESP32 C3 chip.
-It aims to be completely independent from the ESP-IDF, and based solely
-on the [ESP32 C3 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf).
+It aims to be completely independent from the ESP-IDF (see dependencies
+section below), and based solely on the
+[ESP32 C3 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf).
 
 # Environment setup
 
