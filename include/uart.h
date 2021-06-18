@@ -3,57 +3,87 @@
 
 #pragma once
 
+#include "gpio.h"
+
 // TODO(cpq): implement properly!
-static inline unsigned long uart_tx_pin(int pin, int baud, uint8_t c) {
-  unsigned long s = time_us(), t = (unsigned long) (1000000 / baud), u = s;
+static inline void uart_tx_pin(int pin, int baud, uint8_t c) {
+  unsigned long s = time_us(), t = (unsigned long) (100000000 / baud);
   gpio_write(pin, 0);
-  for (u += t; time_us() < u;) spin(1);
+  for (s += t / 100; time_us() < s;) spin(1);
   for (int i = 0; i < 8; i++) {
     gpio_write(pin, c & (1U << i));
-    for (u += t; time_us() < u;) spin(1);
+    for (s += t / 100; time_us() < s;) spin(1);
   }
   gpio_write(pin, 1);
-  for (u += t; time_us() < u;) spin(1);
-  return time_us() - s;
+  for (s += t / 100; time_us() < s;) spin(1);
 }
 
 // Polling read, very unreliable. Interrupts should be used
-// Return 1 if a character was read, 0 otherwise
-static inline int uart_rx_pin(int pin, int baud, uint8_t *c) {
-  unsigned long s = time_us(), t = (unsigned long) (1000000 / baud);
-  if (gpio_read(pin)) return -1;
-  for (s += t * 3 / 2; time_us() < s;) spin(1);
+// Return true if a character was read, false otherwise
+static inline bool uart_rx_pin(int pin, int baud, uint8_t *c) {
+  unsigned long s = time_us(), t = (unsigned long) (100000000 / baud);
+  if (gpio_read(pin)) return false;
+  for (s += t * 11 / 800; time_us() < s;) spin(1);
   *c = 0;
   for (int i = 0; i < 8; i++) {
+    // gpio_write(1, 1), gpio_write(1, 0); // Pulse to see on a scope
     *c |= (uint8_t)(gpio_read(pin) << i);
-    for (s += t; time_us() < s;) spin(1);
+    for (s += t / 100; time_us() < s;) spin(1);
   }
-  for (s += t / 2; time_us() < s;) spin(1);
   // Wait here for the next start bit
-  for (s += t * 50; gpio_read(pin) > 0 && time_us() < s;) spin(1);
-  return 0;
+  for (s += t; gpio_read(pin) > 0 && time_us() < s;) spin(1);
+  return true;
 }
 
-#if defined(ESP32C3) || defined(ESP32)
-static inline int uart_rx(unsigned char *c) {
-  extern int uart_rx_one_char(unsigned char *);
-  return uart_rx_one_char(c);
+#if defined(ESP32C3)
+static inline void uart_init(int no, int tx, int rx, int baud) {
+  enum { FIFO = 0, CLK_DIV = 5, STATUS = 7, CONF0, CONF1, CLK_CONF = 30 };
+  volatile uint32_t *uart = no ? REG(C3_UART1) : REG(C3_UART);
+  uint32_t div = (uint32_t)(4000U * 1000000 / (uint32_t) baud);
+  uart[CLK_DIV] = div / 100;                        // Integral part
+  uart[CLK_DIV] |= (16 * (div % 100) / 100) << 20;  // Fractional part
+  uart[CONF0] &= ~BIT(28);                          // Clear UART_MEM_CLK_EN
+  uart[CONF0] |= BIT(26);                           // Set UART_ERR_WR_MASK
+  uart[CONF1] = 1;                                  // RXFULL -> 1, TXEMPTY -> 0
+  uart[CLK_CONF] = BIT(25) | BIT(24) | BIT(22) | BIT(21) | BIT(20);
+
+  // Set TX pin
+  REG(C3_GPIO)[GPIO_OUT_EN] |= BIT(tx);
+  REG(C3_GPIO)[GPIO_OUT_FUNC + tx] &= ~255U;
+  REG(C3_GPIO)[GPIO_OUT_FUNC + tx] |= no ? 9 : 6;
+
+  // Set RX pin
+  REG(C3_GPIO)[GPIO_OUT_EN] &= ~BIT(rx);                 // Disable output
+  REG(C3_IO_MUX)[1 + rx] = BIT(8) | BIT(9) | (1U << 9);  // input, PU, GPIO
+  REG(C3_GPIO)[GPIO_IN_FUNC + (no ? 9 : 6)] = BIT(6) | (uint8_t) rx;
 }
 
-static inline int uart_tx(unsigned char byte) {
-  extern int uart_tx_one_char(unsigned char);
-  return uart_tx_one_char(byte);
+static inline unsigned long uart_status(int no) {
+  volatile uint32_t *uart = no ? REG(C3_UART1) : REG(C3_UART);
+  return uart[7];
 }
+
+static inline bool uart_read(int no, uint8_t *c) {
+  volatile uint32_t *uart = no ? REG(C3_UART1) : REG(C3_UART);
+  if ((uart[7] & 63) == 0) return false;
+  *c = uart[0] & 255;
+  return true;
+}
+
+static inline void uart_write(int no, uint8_t c) {
+  volatile uint32_t *uart = no ? REG(C3_UART1) : REG(C3_UART);
+  uart[0] = c;
+}
+#elif defined(ESP32)
 #elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
-static inline int uart_tx(uint8_t ch) {
-  while (write(1, &ch, 1) != 1) (void) 0;
-  return 0;
+static inline bool uart_read(int no, uint8_t *c) {
+  int fd = no == 0 ? 0 : -1;
+  return read(fd, ch, 1) == 1 ? true : false;
 }
-static inline int uart_rx(uint8_t *ch) {
-  return read(0, ch, 1) == 1 ? 0 : -1;
-}
-static inline int uart_tx_one_char(uint8_t ch) {
-  return write(1, &ch, 1) > 0 ? 0 : -1;
+
+static inline void uart_write(int no, uint8_t c) {
+  int fd = no == 0 ? 1 : -1;
+  write(fd, &ch, 1);
 }
 #else
 #error "Ouch"

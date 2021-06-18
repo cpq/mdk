@@ -1,8 +1,8 @@
 # ESP32 SDK
 
-This is an alternative, make-based, bare metal SDK for the ESP32 chip.
-Main source of inspiration is ESP32 TRM:
-[esp32_technical_reference_manual_en.pdf](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)
+This is an alternative, make-based, bare metal SDK for the ESP32 C3 chip.
+It aims to be completely independent from the ESP-IDF, and based solely
+on the [ESP32 C3 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf).
 
 # Environment setup
 
@@ -48,37 +48,35 @@ Usage: riscv32-esp-elf-gcc [options] file...
 
 # Project build
 
+A blinky example takes ~2 seconds to build and flash:
+
 ```sh
 $ make -C examples/blinky clean build flash
 ```
 
-# TODO
+# API reference
 
-- Do a proper peripheral setup - enable WiFi radio
-- Pull in cnip and attach to the WiFi radio IO
-- Implement malloc/free that uses several memory regions - use all RAM we could
-  For example, an unused CPU1 cache in IRAM
-- Implement simple task switching (RTOS), to prevent busy loops resetting us
-- Don't bother enabling 2nd core, C3 does not have it anyway
-- Design and implement GPIO, SPI, I2C API
+All API are implemented from scratch using datasheet.
 
-# Notes
+- GPIO
+- SPI (software bit-bang using GPIO API)
+- UART
+- LEDC
+- WDT
+- Timer
+- System
+- Log
+- TCP/IP
 
-- Currently, an application gets loaded to the `0x10000` address - that's
-  the address where ROM 1st stage boot loader jumps to. Partitions are not
-  used. Implement partitioning later on for OTA support
-- ESP32 has complex memory structure, with several SROM chunks and several
-  SRAM chunks. Data/instructions RAM are different, hence there is DRAM (data)
-  and IRAM (code) regions. They are non-contiguous. See `ld/esp32.ld`
-- ROM contains a lot of functions pre-burned on a chip. The implementation
-  is hidden, but signatures and function addresses are published,
-  see https://github.com/espressif/esp-idf/tree/master/components/esp_rom
-- We can pull some implementation, like libc's `memset`, `strlen` and so
-  on, from ROM. ROM's implementation uses newlib
-- We cannot use ROM's `malloc`, cause we don't know what memory regions
-  it is going to use
+# ESP-IDF dependencies
 
-Partitions table used:
+This SDK aims to be ESP-IDF independent, however at this moment the following
+dependencies are present:
+
+- esptool.py script for flashing firmware and preparing image files
+- `boot/bootloader_*.bin` - 2nd stage bootloader
+- `boot/partitions.bin` - a partition table (see below)
+
 ```csv
 nvs,      data, nvs,     0x9000,    20K,
 app0,     app,  ota_0,   0x10000,   1280K,

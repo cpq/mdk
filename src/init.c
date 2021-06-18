@@ -45,19 +45,15 @@ void __assert_func(const char *a, int b, const char *c, const char *d) {
 static void clock_init(void) {
 #if defined(ESP32C3)
   // TRM 6.2.4.1
-#define SYSTEM_SYSCLK_CONF_REG REG(0x600c0058)
-#define SYSTEM_CPU_PER_CONF_REG REG(0x600c0008)
-  SYSTEM_SYSCLK_CONF_REG[0] &= 3U << 10;
-  SYSTEM_SYSCLK_CONF_REG[0] |= 1U << 10;
-  SYSTEM_CPU_PER_CONF_REG[0] &= 3U;
-  SYSTEM_CPU_PER_CONF_REG[0] |= BIT(2) | BIT(0);
+  REG(C3_SYSTEM)[2] &= ~3U;
+  REG(C3_SYSTEM)[2] |= BIT(0) | BIT(2);
+  REG(C3_SYSTEM)[22] = BIT(19) | (40U << 12) | BIT(10);
+  // REG(C3_RTCCNTL)[47] = 0; // RTC_APB_FREQ_REG -> freq >> 12
+  ((void (*)(int)) 0x40000588)(160);  // ets_update_cpu_frequency(160)
 
   // Configure system clock timer, TRM 8.3.1, 8.9
   TIMG0_REG[1] = TIMG0_REG[2] = 0UL;  // Reset LO and HI counter
   TIMG0_REG[8] = 0;                   // Trigger reload
-  // TIMG0_REG[0] = 0;                                       // Disable first
-  // TIMG0_REG[0] |= (83U << 13);                            // Set the divider
-  // TIMG0_REG[0] |= BIT(12) | BIT(29) | BIT(30) | BIT(31);  // Reset
   TIMG0_REG[0] = (83U << 13) | BIT(12) | BIT(29) | BIT(30) | BIT(31);
 #endif
 }

@@ -3,39 +3,37 @@
 
 #pragma once
 
+#include "soc.h"
+
 #if defined(ESP32C3)
-#define GPIO_FUNC_OUT_SEL_CFG_REG REG(0x60004554)
-#define GPIO_OUT_REG REG(0x60004004)
-#define GPIO_IN_REG REG(0x6000403c)
-#define GPIO_ENABLE_REG REG(0x60004020)
-#define GPIO_MUX_REG REG(0x60009004)
+enum { GPIO_OUT_EN = 8, GPIO_OUT_FUNC = 341, GPIO_IN_FUNC = 85 };
 
 static inline void gpio_output_enable(int pin, bool enable) {
-  GPIO_ENABLE_REG[0] &= ~BIT(pin);
-  GPIO_ENABLE_REG[0] |= (enable ? 1U : 0U) << pin;
+  REG(C3_GPIO)[GPIO_OUT_EN] &= ~BIT(pin);
+  REG(C3_GPIO)[GPIO_OUT_EN] |= (enable ? 1U : 0U) << pin;
 }
 
 static inline void gpio_output(int pin) {
-  GPIO_FUNC_OUT_SEL_CFG_REG[pin] = 128;  // Simple output, TRM 5.5.3
+  REG(C3_GPIO)[GPIO_OUT_FUNC + pin] = BIT(9) | 128;  // Simple out, TRM 5.5.3
   gpio_output_enable(pin, 1);
 }
 
 static inline void gpio_write(int pin, bool value) {
-  GPIO_OUT_REG[0] &= ~BIT(pin);                 // Clear first
-  GPIO_OUT_REG[0] |= (value ? 1U : 0U) << pin;  // Then set
+  REG(C3_GPIO)[1] &= ~BIT(pin);                 // Clear first
+  REG(C3_GPIO)[1] |= (value ? 1U : 0U) << pin;  // Then set
 }
 
 static inline void gpio_toggle(int pin) {
-  GPIO_OUT_REG[0] ^= BIT(pin);
+  REG(C3_GPIO)[1] ^= BIT(pin);
 }
 
 static inline void gpio_input(int pin) {
-  gpio_output_enable(pin, 0);   // Disable output
-  GPIO_MUX_REG[pin] = BIT(9) | BIT(8);  // Enable pull-up
+  gpio_output_enable(pin, 0);                 // Disable output
+  REG(C3_IO_MUX)[1 + pin] = BIT(9) | BIT(8);  // Enable pull-up
 }
 
 static inline bool gpio_read(int pin) {
-  return GPIO_IN_REG[0] & BIT(pin) ? 1 : 0;
+  return REG(C3_IO_MUX)[15] & BIT(pin) ? 1 : 0;
 }
 
 #elif defined(ESP32)

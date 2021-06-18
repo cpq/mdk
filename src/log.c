@@ -1,7 +1,7 @@
 #include <sdk.h>
 
 static void logc(int c) {
-  uart_tx((unsigned char) c);
+  uart_write(0, (unsigned char) c);
 }
 
 static void logx(unsigned long v) {

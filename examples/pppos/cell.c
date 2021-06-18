@@ -8,27 +8,27 @@
 
 #include "cell.h"
 
-#define TIMEOUT_MS 1000
+#define TIMEOUT_MS 500
 
 #if 1
 #include "log.h"
-#define DEBUG(fmt, ...) sdk_log(fmt, __VA_ARGS__)
+#define DEBUG(x) sdk_log x
 #else
-#define DEBUG(fmt, ...)
+#define DEBUG()
 #endif
 
 void cell_rx(struct cell *cell, uint8_t c) {
-  cell->buf[cell->len++] = c;                  // Append to recv buffer
-  if (cell->len >= cell->size) cell->len = 0;  // Silent flush
+  if (cell->len + 2 > cell->size) cell->len = 0;  // Silent flush
+  cell->buf[cell->len++] = c;                     // Append to recv buffer
+  cell->buf[cell->len] = '\0';                    // For printf()
 }
 
 static void handle_response(struct cell *cell, char *buf, int len) {
-  while (len > 0 && buf[len - 1] == '\r') buf[--len] = '\0';
-  DEBUG("response: [%s]\n", buf);
-  if (memcmp(buf, "OK", 2) == 0) {
-    cell->cmd++;
-    cell->expire = 0;
-  } else if (memcmp(buf, "ERROR", 5) == 0) {
+  DEBUG(("  RESP: (%d) [%s]\n", cell->len, cell->buf));
+  if (len >= 2 && memcmp(buf, "OK", 2) == 0) {
+    cell->cmd++;       // Switch to the next command
+    cell->expire = 0;  // Schedule it to be sent
+  } else if (len >= 5 && memcmp(buf, "ERROR", 5) == 0) {
     cell->state = CELL_START;
   }
 }
@@ -37,11 +37,14 @@ static void cmd_exec(struct cell *cell, unsigned long now) {
   if (cell->cmds == NULL || cell->cmds[cell->cmd] == NULL) return;
   const char *cmd = cell->cmds[cell->cmd];
   if (cell->expire == 0) {
-    cell->tx(cmd, (int) strlen(cmd));
-    cell->expire = now + TIMEOUT_MS;  // Set the expire
-    cell->len = 0;                    // Clear off receive buffer
-  } else if (cell->expire < now) {
-    DEBUG("Expired: [%s]\n", cmd);
+    DEBUG(("Sending [%s]\n", cmd));
+    cell->expire = now + TIMEOUT_MS;   // Set the expire
+    cell->len = 0;                     // Clear off receive buffer
+    cell->buf[0] = '\0';
+    cell->tx(cmd, (int) strlen(cmd));  // Send command
+    cell->tx("\r\n", 2);               // CR LF after
+  } else if (now > cell->expire) {
+    DEBUG(("Expired: [%s], input: (%d) [%s]\n", cmd, cell->len, cell->buf));
     cell->state = CELL_START;
   } else {
     int discard = 0;
@@ -58,8 +61,9 @@ static void cmd_exec(struct cell *cell, unsigned long now) {
 void cell_poll(struct cell *cell, unsigned long now) {
   switch (cell->state) {
     case CELL_START:
-      cell->tx("+++\r\n", 5);
-      cell->expire = now + 1500;
+      // cell->tx("+++\r\n", 5);
+      cell->tx("AT\r\n", 4);
+      cell->expire = now + 300;
       cell->state = CELL_WAIT;
       break;
     case CELL_WAIT:

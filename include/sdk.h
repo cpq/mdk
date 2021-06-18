@@ -23,7 +23,9 @@
 #endif
 
 #include "gpio.h"
+#include "ledc.h"
 #include "log.h"
+#include "soc.h"
 #include "spi.h"
 #include "sys.h"
 #include "tcpip.h"

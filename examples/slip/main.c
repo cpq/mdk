@@ -2,7 +2,7 @@
 #include "../../tools/slip.h"
 
 static void tx(unsigned char c, void *arg) {
-  uart_tx(c);
+  uart_write(0, c);
   (void) arg;
 }
 
@@ -25,7 +25,7 @@ int main(void) {
   unsigned long uptime_ms = 0;  // Pretend we know what time it is
   for (;;) {
     uint8_t c;
-    if (uart_rx(&c) == 0) {
+    if (uart_read(0, &c)) {
       size_t len = slip_recv(c, &slip);
       if (len > 0) net_input(&netif, slip.buf, slip.size, len);
       if (len == 0 && slip.mode == 0) sdk_log("%c", c);
