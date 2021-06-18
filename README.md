@@ -95,14 +95,15 @@ make unix
 ```
 
 That builds a `build/firmware` executable.
-To support that, all hardware API like GPIO have UNIX implementation.
+To support that, all hardware API are mocked out. The typical API
+implementation looks like:
 
-- instead of the toolchain's crosscompiler, a host's `$(CC)` compiler is used
-  and a usual UNIX binary is built as a firmware file.
-- Firmware uses `/dev/ptyp3` as a UART device. Note: so to "talk" to the
-  firmware via UART, `/dev/ttyp3` should be used.
-
-This helps to mock/test SDK or firmware functionality without an actual
-hardware device. Specifically, TCP/IP stack functionality could be developed
-and tested on a UNIX machine, provided an appropriate terminal utility
-is available.
+```c
+#if defined(ESP32C3)
+...
+#elif defined(ESP32)
+...
+#elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
+...  <-- Here goes a mocked-out hardware API implementation
+#endif
+```
