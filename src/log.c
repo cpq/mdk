@@ -1,7 +1,37 @@
 #include <sdk.h>
 
 static void logc(int c) {
+  // extern int uart_tx_one_char(int c);
+  // uart_tx_one_char(c);
   uart_write(0, (unsigned char) c);
+}
+
+static void logs(const char *buf, size_t len) {
+  for (size_t i = 0; i < len; i++) logc(buf[i]);
+}
+
+static unsigned char nibble(unsigned char c) {
+  return c < 10 ? c + '0' : c + 'W';
+}
+
+#define ISPRINT(x) ((x) >= ' ' && (x) <= '~')
+void sdk_hexdump(const void *buf, size_t len) {
+  const unsigned char *p = buf;
+  unsigned char ascii[16] = "", alen = 0;
+  for (size_t i = 0; i < len; i++) {
+    if ((i % 16) == 0) {
+      // Print buffered ascii chars
+      if (i > 0) logc('\t'), logs((char *) ascii, 16), logc('\n'), alen = 0;
+      // Print hex address, then \t
+      logc(nibble((i >> 12) & 15)), logc(nibble((i >> 8) & 15)),
+          logc(nibble((i >> 4) & 15)), logc('0'), logc('\t');
+    }
+    logc(nibble(p[i] >> 4)), logc(nibble(p[i] & 15));  // Two nibbles, e.g. c5
+    logc(' ');                                         // Space after hex number
+    ascii[alen++] = ISPRINT(p[i]) ? p[i] : '.';        // Add to the ascii buf
+  }
+  while (alen < 16) logs("   ", 3), ascii[alen++] = ' ';
+  logc('\t'), logs((char *) ascii, 16), logc('\n');
 }
 
 static void logx(unsigned long v) {
@@ -10,7 +40,7 @@ static void logx(unsigned long v) {
     bits -= 4;
     unsigned char c = (v >> bits) & 15;
     if (show == 0 && c == 0) continue;
-    logc(c < 10 ? c + '0' : c + 'W');
+    logc(nibble(c));
     show = 1;
   }
   if (show == 0) logc('0');
@@ -39,7 +69,7 @@ void sdk_vlog(const char *fmt, va_list ap) {
     switch (c) {
       case 's': {
         const char *s = va_arg(ap, char *);
-        for (size_t i = 0; i < strlen(s); i++) logc(s[i]);
+        logs(s, strlen(s));
         break;
       }
       case 'c':

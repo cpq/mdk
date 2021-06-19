@@ -5,7 +5,7 @@
 
 #include "gpio.h"
 
-// TODO(cpq): implement properly!
+// Software UART send
 static inline void uart_tx_pin(int pin, int baud, uint8_t c) {
   unsigned long s = time_us(), t = (unsigned long) (100000000 / baud);
   gpio_write(pin, 0);
@@ -18,7 +18,7 @@ static inline void uart_tx_pin(int pin, int baud, uint8_t c) {
   for (s += t / 100; time_us() < s;) spin(1);
 }
 
-// Polling read, very unreliable. Interrupts should be used
+// Software UART receive. Polling, very unreliable. Interrupts should be used
 // Return true if a character was read, false otherwise
 static inline bool uart_rx_pin(int pin, int baud, uint8_t *c) {
   unsigned long s = time_us(), t = (unsigned long) (100000000 / baud);
@@ -45,7 +45,7 @@ static inline void uart_init(int no, int tx, int rx, int baud) {
   uart[CONF0] &= ~BIT(28);                          // Clear UART_MEM_CLK_EN
   uart[CONF0] |= BIT(26);                           // Set UART_ERR_WR_MASK
   uart[CONF1] = 1;                                  // RXFULL -> 1, TXEMPTY -> 0
-  uart[CLK_CONF] = BIT(25) | BIT(24) | BIT(22) | BIT(21) | BIT(20);
+  uart[CLK_CONF] = BIT(25) | BIT(24) | BIT(22) | BIT(21) | BIT(20);  // Use APB
 
   // Set TX pin
   REG(C3_GPIO)[GPIO_OUT_EN] |= BIT(tx);
@@ -63,27 +63,31 @@ static inline unsigned long uart_status(int no) {
   return uart[7];
 }
 
+#define UART_TX_FIFO_LEN(uart) ((uart[7] >> 16) & 127)
+#define UART_RX_FIFO_LEN(uart) ((uart[7]) & 127)
+
 static inline bool uart_read(int no, uint8_t *c) {
   volatile uint32_t *uart = no ? REG(C3_UART1) : REG(C3_UART);
-  if ((uart[7] & 63) == 0) return false;
+  if (UART_RX_FIFO_LEN(uart) == 0) return false;
   *c = uart[0] & 255;
   return true;
 }
 
 static inline void uart_write(int no, uint8_t c) {
   volatile uint32_t *uart = no ? REG(C3_UART1) : REG(C3_UART);
+  while (UART_TX_FIFO_LEN(uart) > 100) delay_us(1);
   uart[0] = c;
 }
 #elif defined(ESP32)
 #elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
 static inline bool uart_read(int no, uint8_t *c) {
   int fd = no == 0 ? 0 : -1;
-  return read(fd, ch, 1) == 1 ? true : false;
+  return read(fd, c, 1) == 1 ? true : false;
 }
 
 static inline void uart_write(int no, uint8_t c) {
   int fd = no == 0 ? 1 : -1;
-  write(fd, &ch, 1);
+  write(fd, &c, 1);
 }
 #else
 #error "Ouch"

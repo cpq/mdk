@@ -12,6 +12,7 @@ struct net_if {
   uint8_t mac[6];                     // MAC address
   uint32_t ip, mask, gw;              // Leave zeros to use DCHP
 };
+size_t ppp_input(struct net_if *, void *, size_t);        // Handle PPP data
 void net_input(struct net_if *, void *, size_t, size_t);  // Handle frame
 void net_poll(struct net_if *, unsigned long);            // Call periodically
 

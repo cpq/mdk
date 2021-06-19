@@ -52,7 +52,14 @@ Usage: riscv32-esp-elf-gcc [options] file...
 A blinky example takes ~2 seconds to build and flash:
 
 ```sh
-$ make -C examples/blinky clean build flash
+$ cd examples/blinky
+$ make clean build flash monitor
+```
+
+Run unit test and build all examples:
+
+```sh
+$ make -C tools test examples clean
 ```
 
 # API reference
@@ -60,13 +67,63 @@ $ make -C examples/blinky clean build flash
 All API are implemented from scratch using datasheet.
 
 - GPIO
+  ```c
+  void gpio_output(int pin);              // Set pin mode to OUTPUT
+  void gpio_input(int pin);               // Set pin mode to INPUT
+  void gpio_write(int pin, bool value);   // Set pin to low (false) or high
+  void gpio_toggle(int pin);              // Toggle pin value
+  bool gpio_read(int pin);                // Read pin value
+  ```
 - SPI (software bit-bang using GPIO API)
+  ```c
+  // SPI descriptor. Specifies pins for MISO, MOSI, CLK and chip select
+  struct spi { int miso, mosi, clk, cs[3]; };
+
+  bool spi_init(struct spi *spi);           // Init SPI
+  void spi_begin(struct spi *spi, int cs);  // Start SPI transaction
+  void spi_end(struct spi *spi, int cs);    // End SPI transaction
+  unsigned char spi_txn(struct spi *spi, unsigned char);   // Do SPI transaction
+  ```
 - UART
+  ```c
+  void uart_init(int no, int tx, int rx, int baud);   // Initialise UART
+  bool uart_read(int no, uint8_t *c);   // Read byte. Return true on success
+  void uart_write(int no, uint8_t c);   // Write byte. Block if FIFO is full
+  ```
 - LEDC
 - WDT
+  ```c
+  void wdt_disable(void);   // Disable watchdog
+  ```
 - Timer
+  ```c
+  struct timer {
+    uint64_t period;       // Timer period in micros
+    uint64_t expire;       // Expiration timestamp in micros
+    void (*fn)(void *);    // Function to call
+    void *arg;             // Function argument
+    struct timer *next;    // Linkage
+  };
+
+  #define TIMER_ADD(head_, p_, fn_, arg_)
+  void timers_poll(struct timer *head, uint64_t now);
+  ```
 - System
+  ```c
+  int sdk_ram_used(void);           // Return used RAM in bytes
+  int sdk_ram_free(void);           // Return free RAM in bytes
+  unsigned long time_us(void);      // Return uptime in microseconds
+  void delay_us(unsigned long us);  // Block for "us" microseconds
+  void delay_ms(unsigned long ms);  // Block for "ms" milliseconds
+  void spin(unsigned long count);   // Execute "count" no-op instructions
+  ```
 - Log
+  ```c
+  void sdk_log(const char *fmt, ...);   // Log message to UART 0
+                                        // Supported specifiers:
+                                        // %d, %x, %s, %p
+  void sdk_hexdump(const void *buf, size_t len);  // Hexdump buffer
+  ```
 - TCP/IP
 
 # ESP-IDF dependencies
