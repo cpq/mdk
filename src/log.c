@@ -1,4 +1,4 @@
-#include <sdk.h>
+#include "sdk.h"
 
 static void logc(int c) {
   // extern int uart_tx_one_char(int c);

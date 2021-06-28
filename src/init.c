@@ -1,7 +1,7 @@
 // Copyright (c) 2021 Cesanta
 // All rights reserved
 
-#include <sdk.h>
+#include "sdk.h"
 
 extern int main(void);
 

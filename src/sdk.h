@@ -32,3 +32,4 @@
 #include "timer.h"
 #include "uart.h"
 #include "wdt.h"
+#include "wifi.h"

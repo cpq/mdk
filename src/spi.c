@@ -1,7 +1,7 @@
 // Copyright (c) 2021 Cesanta
 // All rights reserved
 
-#include <sdk.h>
+#include "sdk.h"
 
 // TODO(cpq): make this configurable with accurate frequency
 static inline void spi_clock_delay(void) {

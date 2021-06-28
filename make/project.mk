@@ -11,11 +11,11 @@ TOOLCHAIN ?= riscv64-unknown-elf
 # strict WARNFLAGS protect from stupid mistakes
 
 DEFS      ?=
-INCLUDES  ?= -I. -I$(ROOT_PATH)/include
+INCLUDES  ?= -I. -I$(ROOT_PATH)/src
 WARNFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
 OPTFLAGS  ?= -Os -g3 -ffunction-sections -fdata-sections
-CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(PROJFLAGS) $(CFLAGS_EXTRA)
-LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/ld/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections
+CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(EXTRA_CFLAGS)
+LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
 
 ifeq "$(ARCH)" "c3"
 MCUFLAGS  ?= -march=rv32imc -mabi=ilp32 -DESP32C3
@@ -32,9 +32,10 @@ endif
 CHIP_REV?=
 FLASH_BAUD?=115200
 
-SOURCES += $(ROOT_PATH)/boot/boot_$(ARCH).s
+SOURCES += $(ROOT_PATH)/src/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
-OBJECTS = $(SOURCES:%.c=$(OBJ_PATH)/%.o) #$(OBJ_PATH)/boot.o
+_BJECTS = $(SOURCES:%.c=$(OBJ_PATH)/%.o)
+OBJECTS = $(_BJECTS:%.cpp=$(OBJ_PATH)/%.o)
 
 build: $(OBJ_PATH)/$(PROG).bin
 
@@ -49,6 +50,10 @@ $(OBJ_PATH)/%.o: %.c $(wildcard $(ROOT_PATH)/include/%.h)
 	@mkdir -p $(dir $@)
 	$(TOOLCHAIN)-gcc $(CFLAGS) -c $< -o $@
 
+$(OBJ_PATH)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(TOOLCHAIN)-g++ $(CFLAGS) -c $< -o $@
+
 $(OBJ_PATH)/%.o: %.s
 	@mkdir -p $(dir $@)
 	$(TOOLCHAIN)-gcc $(CFLAGS) -c $< -o $@
@@ -62,8 +67,8 @@ $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 
 flash: $(OBJ_PATH)/$(PROG).bin
 	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
-    $(BLOFFSET) $(ROOT_PATH)/boot/bootloader_$(ARCH)$(CHIP_REV).bin \
-    0x08000 $(ROOT_PATH)/boot/partitions.bin \
+    $(BLOFFSET) $(ROOT_PATH)/src/boot/bootloader_$(ARCH)$(CHIP_REV).bin \
+    0x08000 $(ROOT_PATH)/src/boot/partitions.bin \
     0x10000 $?
 
 monitor:

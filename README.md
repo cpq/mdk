@@ -62,6 +62,17 @@ Run unit test and build all examples:
 $ make -C tools test examples clean
 ```
 
+Project Makefile should look like this:
+
+```make
+SOURCES = main.c another_file.c
+
+EXTRA_CFLAGS ?=
+EXTRA_LINKFLAGS ?=
+
+include $(SDK_PATH)/make/project.mk
+```
+
 # API reference
 
 All API are implemented from scratch using datasheet.
