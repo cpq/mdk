@@ -57,7 +57,7 @@ SOURCES = main.c another_file.c
 EXTRA_CFLAGS ?=
 EXTRA_LINKFLAGS ?=
 
-include $(SDK_PATH)/make/project.mk
+include $(SDK_PATH)/make/build.mk
 ```
 
 - Build one example: `make -C examples/blinky clean build flash monitor`
