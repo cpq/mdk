@@ -9,6 +9,7 @@
 // Low level (hardware) API
 struct net_if {
   void (*out)(const void *, size_t);  // Frame sender function
+  void (*dbg)(const char *, ...);     // Debug print function
   uint8_t mac[6];                     // MAC address
   uint32_t ip, mask, gw;              // Leave zeros to use DCHP
 };

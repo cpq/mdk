@@ -7,7 +7,7 @@ slipterm: slipterm.c
 slipterm-linux: slipterm
 slipterm-linux: CC = docker run -v $(CURDIR):$(CURDIR) -w $(CURDIR) mdashnet/cc2 cc
 
-test: unit_test.c ../src/log.c ../src/init.c
+test: unit_test.c
 	$(CC) -I../include -W -Wall -g3 $? -o /tmp/t && /tmp/t
 
 examples:

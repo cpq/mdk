@@ -3,6 +3,9 @@
 
 #pragma once
 
+#define BIT(x) (1UL << (x))
+#define REG(x) ((volatile uint32_t *) (x))
+
 #define C3_SYSTEM 0x600c0000
 #define C3_SENSITIVE 0x600c1000
 #define C3_INTERRUPT 0x600c2000

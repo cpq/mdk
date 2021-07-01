@@ -24,8 +24,8 @@ int main(void) {
 
   uint8_t x[6];
   getmac(x);
-  extern int wifi_get_macaddr(uint8_t *);
-  sdk_log("-> %d\n", wifi_get_macaddr(x));
+  // extern int wifi_get_macaddr(uint8_t *);
+  // sdk_log("-> %d\n", wifi_get_macaddr(x));
   delay_ms(1000);
 
   // extern void ic_register_rx_cb(void (*)(void));
@@ -41,13 +41,13 @@ int main(void) {
   //((void (*)(void))(uintptr_t) 0x4000187c)();
   // int v = 0;
   for (;;) {
-    uint8_t mac[6] = {};
+    // uint8_t mac[6] = {};
     // wifi_mac(mac);
     // v = ((int (*)(void)) 0x400015e0)();  // ic_mac_init
     // v = ((int (*)(void)) 0x400018a8)();  // wifi_is_started
-    int v = wifi_get_macaddr(mac);
-    sdk_log("WiFi mac: %x:%x:%x:%x:%x:%x %d\n", mac[0], mac[1], mac[2], mac[3],
-            mac[4], mac[5], v);
+    // int v = wifi_get_macaddr(mac);
+    // sdk_log("WiFi mac: %x:%x:%x:%x:%x:%x %d\n", mac[0], mac[1], mac[2],
+    // mac[3], mac[4], mac[5], v);
     delay_ms(1500);
   }
 

@@ -5,13 +5,13 @@
 
 extern int main(void);
 
-static char *s_heap_start;  // Heap start. Set up by sdk_heap_init()
+static char *s_heap_start;  // Heap start. Set up by heap_init()
 static char *s_heap_end;    // Heap end
 static char *s_brk;         // Current heap usage marker
 
 // Initialise newlib malloc. It expects us to implement _sbrk() call,
 // which should return a pointer to the requested memory.
-// Our `sdk_heap_init` function sets up an available memory region.
+// Our `heap_init` function sets up an available memory region.
 //
 //   s_heap_start                s_brk               s_heap_end
 //      |--------------------------|----------------------|
@@ -25,7 +25,7 @@ int sdk_ram_free(void) {
   return (int) (s_heap_end - s_brk);
 }
 
-static void sdk_heap_init(void *start, void *end) {
+static void heap_init(void *start, void *end) {
   s_heap_start = s_brk = start, s_heap_end = end;
 }
 
@@ -66,7 +66,8 @@ void startup(void) {
   extern char _sbss, _ebss, _end, _eram;
 #endif
   for (char *p = &_sbss; p < &_ebss;) *p++ = '\0';
-  sdk_heap_init(&_end, &_eram);
+  heap_init(&_end, &_eram);
+  sdk_log("BSS INIT: %p - %p, %p\n", &_sbss, &_ebss, s_brk);
   clock_init();
   main();
 }

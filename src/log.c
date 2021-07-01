@@ -1,8 +1,8 @@
-#include "sdk.h"
+#include "log.h"
+#include <string.h>
 
 static void logc(int c) {
-  // extern int uart_tx_one_char(int c);
-  // uart_tx_one_char(c);
+  extern void uart_write(int, unsigned char);
   uart_write(0, (unsigned char) c);
 }
 
@@ -59,17 +59,22 @@ static void logd(unsigned long v) {
 }
 
 void sdk_vlog(const char *fmt, va_list ap) {
-  int c;
+  int c, precision;
   while ((c = *fmt++) != '\0') {
     if (c != '%') {
       logc(c);
       continue;
     }
-    c = *fmt++;
+    c = *fmt++, precision = 0;
+    if (c == '.') {
+      precision = *fmt++ - '0';
+      if (precision + '0' == '*') precision = va_arg(ap, int);
+      c = *fmt++;
+    }
     switch (c) {
       case 's': {
         const char *s = va_arg(ap, char *);
-        logs(s, strlen(s));
+        logs(s, precision > 0 ? (size_t) precision : strlen(s));
         break;
       }
       case 'c':

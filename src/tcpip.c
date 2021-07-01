@@ -4,13 +4,6 @@
 #include "tcpip.h"
 #include <string.h>
 
-#if 1
-#include "log.h"
-#define DEBUG(x) sdk_log x
-#else
-#define DEBUG(x)
-#endif
-
 struct lcp {
   uint8_t addr, ctrl, proto[2], code, id, len[2];
 } __attribute__((packed));
@@ -103,7 +96,7 @@ static void net_arp(struct net_if *ifp, struct eth *eth, struct arp *arp) {
     memcpy(arp->sha, ifp->mac, sizeof(arp->sha));
     arp->tpa = arp->spa;
     arp->spa = ifp->ip;
-    DEBUG(("%s", "ARP response\n"));
+    ifp->dbg("%s", "ARP response\n");
     ifp->out(eth, sizeof(*eth) + sizeof(*arp));
   } else if (arp->op == NET16(2)) {
     // ARP response
@@ -134,7 +127,7 @@ static void net_icmp(struct net_if *ifp, struct eth *eth, struct ip *ip,
     icmp->csum = 0;  // Important - clear csum before recomputing
     icmp->csum = ipcsum((uint8_t *) icmp, (uint8_t *) (icmp + 1) + len);
     size_t n = (size_t)((char *) (icmp + 1) - (char *) eth) + len;
-    DEBUG(("ICMP response %d\n", n));
+    ifp->dbg("ICMP response %d\n", n);
     ifp->out(eth, n);
   }
 }
@@ -144,25 +137,25 @@ static void net_ip(struct net_if *ifp, struct eth *eth, struct ip *ip,
   if (ip->proto == 1) {
     struct icmp *icmp = (struct icmp *) (ip + 1);
     if (len < sizeof(*icmp)) return;
-    DEBUG(("ICMP %d\n", len));
+    ifp->dbg("ICMP %d\n", len);
     net_icmp(ifp, eth, ip, icmp, len - sizeof(*icmp));
   }
 }
 
 void net_input(struct net_if *ifp, void *buf, size_t mtu, size_t len) {
-  // DEBUG(("got frame %u bytes\n", len));
+  // ifp->dbg("got frame %u bytes\n", len);
   struct eth *eth = buf;
   if (len < sizeof(*eth)) return;  // Truncated packet - runt?
   if (eth->type == NET16(0x806)) {
     struct arp *arp = (struct arp *) (eth + 1);
     if (sizeof(*eth) + sizeof(*arp) > len) return;  // Truncated
-    DEBUG(("ARP %d\n", len));
+    ifp->dbg("ARP %d\n", len);
     net_arp(ifp, eth, arp);
   } else if (eth->type == NET16(0x800)) {
     struct ip *ip = (struct ip *) (eth + 1);
     if (len < sizeof(*eth) + sizeof(*ip)) return;  // Truncated packed
     if (ip->ver != 0x45) return;                   // Not IP
-    DEBUG(("IP %d\n", len));
+    ifp->dbg("IP %d\n", len);
     net_ip(ifp, eth, ip, len - sizeof(*eth) - sizeof(*ip));
   }
   (void) mtu;
@@ -212,22 +205,22 @@ size_t ppp_input(struct net_if *ifp, void *buf, size_t len) {
     if (p[n] == 0x7e) cnt++;
     if (cnt == 2) {
       if (n < 4) return n + 1;
-      // DEBUG(("PPP frame: %d bytes\n", n + 1));
+      // ifp->dbg("PPP frame: %d bytes\n", n + 1);
       // sdk_hexdump(buf, n + 1);
       uint8_t tmp[n + 2];
       size_t dec = ppp_decode(p + 1, n - 3, tmp);
-      DEBUG(("PPP decoded: %d bytes\n", dec));
-      sdk_hexdump(tmp, dec);
+      ifp->dbg("PPP decoded: %d bytes\n", dec);
+      // sdk_hexdump(tmp, dec);
 
       struct lcp *lcp = (struct lcp *) tmp;
-      // DEBUG(("LCP %d %d %d\n", dec, sizeof(*lcp), (int) U16(lcp->len)));
+      // ifp->dbg("LCP %d %d %d\n", dec, sizeof(*lcp), (int) U16(lcp->len));
       if (dec >= sizeof(*lcp) && lcp->addr == 0xff && lcp->ctrl == 0x3 &&
           lcp->proto[0] == 0xc0 && lcp->proto[1] == 0x21) {
         if (lcp->code == 1) {        // Config req
           if (U16(lcp->len) == 4) {  // We've got "no options" req
             lcp->code = 2;           // Ack
-            DEBUG(("ACK\n"));
-            sdk_hexdump(tmp, dec);
+            ifp->dbg("ACK\n");
+            // sdk_hexdump(tmp, dec);
             size_t enc = ppp_encode(tmp, dec, buf);
             ifp->out(buf, enc);
             lcp->code = 1;  // request no options
@@ -236,8 +229,8 @@ size_t ppp_input(struct net_if *ifp, void *buf, size_t len) {
           } else {
             lcp->code = 4;  // Reject. Ask for "no options"
             size_t enc = ppp_encode(tmp, dec, buf);
-            DEBUG(("REJ\n"));
-            sdk_hexdump(tmp, dec);
+            ifp->dbg("REJ\n");
+            // sdk_hexdump(tmp, dec);
             ifp->out(buf, enc);
           }
         } else if (lcp->code == 5) {

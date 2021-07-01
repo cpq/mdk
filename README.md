@@ -49,19 +49,6 @@ Usage: riscv32-esp-elf-gcc [options] file...
 
 # Project build
 
-A blinky example takes ~2 seconds to build and flash:
-
-```sh
-$ cd examples/blinky
-$ make clean build flash monitor
-```
-
-Run unit test and build all examples:
-
-```sh
-$ make -C tools test examples clean
-```
-
 Project Makefile should look like this:
 
 ```make
@@ -72,6 +59,9 @@ EXTRA_LINKFLAGS ?=
 
 include $(SDK_PATH)/make/project.mk
 ```
+
+- Build one example: `make -C examples/blinky clean build flash monitor`
+- Build all examples: `make -C tools test examples clean`
 
 # API reference
 

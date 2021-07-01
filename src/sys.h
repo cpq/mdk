@@ -11,10 +11,16 @@ static inline void spin(volatile unsigned long count) {
 }
 
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
+
+#include <errno.h>
+#include <fcntl.h>
+#include <string.h>
+#include <termios.h>
 #include <time.h>
+
 #define NOPS_PER_MS 99999999
 static inline unsigned long time_us(void) {
-  return (unsigned long) time(NULL) * 1000;
+  return (unsigned long) time(NULL) * 1000000;
 }
 #else
 #define TIMG0_REG REG(0x6001f000)  // Timer group 0

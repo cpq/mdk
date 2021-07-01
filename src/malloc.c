@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sdk.h>
+
 struct block {
   size_t size;
   struct block *next;
@@ -41,13 +43,13 @@ void *malloc(size_t size) {
   const size_t align_to = 16;
   size = (size + sizeof(size_t) + (align_to - 1)) & ~(align_to - 1);
 
+
   struct block **h = &s_free;
   while (*h != NULL && (*h)->size < size) h = &(*h)->next;
   if (*h != NULL) {
     *h = (*h)->next;
     return &(*h)->next;
   }
-
   struct block *block = (struct block *) sbrk((int) size);
   if (block == NULL) return block;
   block->size = size;
