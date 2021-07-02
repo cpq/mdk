@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cell.h"
+#include "cellmodem.h"
 
 #define TIMEOUT_MS 1500
 
@@ -83,10 +83,9 @@ void cell_poll(struct cell *cell, unsigned long now) {
       if (cell->cmds == NULL) break;
       cmd_exec(cell, now);
       if (cell->state != CELL_AT) break;
-      if (cmdlen(cell) == 0) cell->len = 0, cell->state = CELL_OK;
+      if (cmdlen(cell) == 0) cell->len = 0, cell->state = CELL_PPP;
       break;
     case CELL_PPP:
-    case CELL_OK:
       break;
   }
 }

@@ -1,5 +1,5 @@
 #include <sdk.h>
-#include "cell.h"
+#include "cellmodem.h"
 
 #define GDCONT "AT+CGDCONT=1,\"IP\",\"iot.1nce.net\""
 #define CELL_UART 1
@@ -17,14 +17,20 @@ int main(void) {
   wdt_disable();
 
   // Allocate serial input buffer and cellular modem context
-  struct cell cell = {.buf = malloc(RXBUFSIZE),
-                      .size = RXBUFSIZE,
-                      .tx = txfn,
-                      .cmds = "ATZ;ATE0;ATI;AT+CIMI;" GDCONT ";ATDT*99***1#",
-                      .dbg = sdk_log};
+  struct cell cell = {
+      .buf = malloc(RXBUFSIZE),
+      .size = RXBUFSIZE,
+      .tx = txfn,
+      .cmds = "ATZ;ATE0;ATI;AT+CIMI;" GDCONT ";ATDT*99***1#",
+      .dbg = sdk_log,
+  };
 
   // Setup TCP/IP netif
-  struct net_if netif = {.out = txfn, .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3}};
+  struct net_if netif = {
+      .out = txfn,
+      .dbg = sdk_log,
+      .mac = {0xd8, 0xa0, 0x1d, 1, 2, 3},
+  };
 
   // Read modem UART in an infinite loop, and feed the stack
   uart_init(CELL_UART, CELL_TX, CELL_RX, CELL_BAUD);
@@ -37,7 +43,7 @@ int main(void) {
 #endif
     while (uart_read(CELL_UART, &c)) cell_input(&cell, c);
     cell_poll(&cell, time_us() / 1000);
-    if (cell.state == CELL_OK && cell.len > 0) {
+    if (cell.state == CELL_PPP && cell.len > 0) {
       size_t n = ppp_input(&netif, cell.buf, cell.len);
       if (n > 0) memmove(cell.buf, cell.buf + n, cell.len - n), cell.len -= n;
     }

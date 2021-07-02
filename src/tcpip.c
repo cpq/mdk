@@ -4,6 +4,8 @@
 #include "tcpip.h"
 #include <string.h>
 
+#include "sdk.h"
+
 struct lcp {
   uint8_t addr, ctrl, proto[2], code, id, len[2];
 } __attribute__((packed));
@@ -205,12 +207,12 @@ size_t ppp_input(struct net_if *ifp, void *buf, size_t len) {
     if (p[n] == 0x7e) cnt++;
     if (cnt == 2) {
       if (n < 4) return n + 1;
-      // ifp->dbg("PPP frame: %d bytes\n", n + 1);
-      // sdk_hexdump(buf, n + 1);
+      ifp->dbg("PPP frame: %d bytes\n", n + 1);
+      sdk_hexdump(buf, n + 1);
       uint8_t tmp[n + 2];
       size_t dec = ppp_decode(p + 1, n - 3, tmp);
       ifp->dbg("PPP decoded: %d bytes\n", dec);
-      // sdk_hexdump(tmp, dec);
+      sdk_hexdump(tmp, dec);
 
       struct lcp *lcp = (struct lcp *) tmp;
       // ifp->dbg("LCP %d %d %d\n", dec, sizeof(*lcp), (int) U16(lcp->len));
@@ -229,8 +231,10 @@ size_t ppp_input(struct net_if *ifp, void *buf, size_t len) {
           } else {
             lcp->code = 4;  // Reject. Ask for "no options"
             size_t enc = ppp_encode(tmp, dec, buf);
-            ifp->dbg("REJ\n");
-            // sdk_hexdump(tmp, dec);
+            ifp->dbg("REJ - PPP\n");
+            sdk_hexdump(tmp, dec);
+            ifp->dbg("REJ - LCP\n");
+            sdk_hexdump(buf, enc);
             ifp->out(buf, enc);
           }
         } else if (lcp->code == 5) {

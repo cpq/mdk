@@ -1,3 +1,3 @@
-SOURCES = main.c cell.c
+SOURCES = main.c cellmodem.c
 
 include ../../make/build.mk

@@ -12,7 +12,7 @@ struct cell {
   void (*dbg)(const char *, ...);    // Debug log function
 };
 
-enum { CELL_START, CELL_WAIT, CELL_AT, CELL_OK, CELL_PPP };  // Modem states
+enum { CELL_START, CELL_WAIT, CELL_AT, CELL_PPP };  // Modem states
 
 void cell_input(struct cell *, unsigned char);        // Feed a character
 void cell_poll(struct cell *, unsigned long now_ms);  // Handle cell

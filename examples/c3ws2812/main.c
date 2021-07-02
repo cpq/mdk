@@ -4,36 +4,21 @@
 static int ws_2812_pin = 8;
 
 // Send a set of colors to the WS2812 (Chain).  Right now, just one LED.
-// Wait at least Spin(2000) time between sending ws_led commands. 
-static void ws_led( const uint8_t * s, int bytes, int ws2812_pin )
-{
-  int i;
-  for( i = 0; i < bytes; i++ )
-  {
-    int v = s[i];
-    int b = 0x80;
-    do
-    {
-      //Tested: about spin(2) is the smallest you can go before
-      // outrunning the chip.  11 is the threshold for
-      //on-time before tripping over to the next.
-      //total period must be greater than 18.
-      if( v & b )
-      {
-        gpio_write( ws2812_pin, 1 );
-        spin(18);
-        gpio_write( ws2812_pin, 0 );
-        spin(6);
-      }
-      else
-      {
-        gpio_write( ws2812_pin, 1 );
-        spin(6);
-        gpio_write( ws2812_pin, 0 );
-        spin(18);
-      }
-      b >>= 1;
-    } while( b );
+// Wait at least Spin(2000) time between sending ws_led commands.
+static void ws_led(const uint8_t *buf, size_t len, int pin) {
+  unsigned long delays[2] = {3, 9};
+  for (size_t i = 0; i < len; i++) {
+    // Tested: about spin(2) is the smallest you can go before
+    // outrunning the chip.  11 is the threshold for
+    // on-time before tripping over to the next.
+    // total period must be greater than 18.
+    for (uint8_t mask = 0x80; mask; mask >>= 1) {
+      int i1 = buf[i] & mask ? 0 : 1, i2 = i1 ^ 1;  // This takes some cycles
+      gpio_write(pin, 1);
+      spin(delays[i1]);
+      gpio_write(pin, 0);
+      spin(delays[i2]);
+    }
   }
 }
 
@@ -74,7 +59,7 @@ int main(void) {
     ws_led( leddata, 3, ws_2812_pin );
 
     frame++;
-    spin(300000); //Wait approx 1/100th of a second.
+    delay_ms(1);
   }
 
   return 0;
