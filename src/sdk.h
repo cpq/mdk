@@ -22,6 +22,7 @@
 #include "uart.h"
 #include "wdt.h"
 #include "wifi.h"
+#include "ws2812.h"
 
 #ifndef LED1
 #define LED1 1  // Default LED pin

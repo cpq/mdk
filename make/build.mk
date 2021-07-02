@@ -42,7 +42,7 @@ build: $(OBJ_PATH)/$(PROG).bin
 unix: MCUFLAGS =
 unix: OPTFLAGS = -O0 -g3
 unix: SRCS = $(filter-out %.s,$(filter-out $(ROOT_PATH)/src/malloc.c,$(SOURCES)))
-unix: $(SOURCES)
+unix: $(SRCS)
 	@mkdir -p $(OBJ_PATH)
 	$(CC) $(CFLAGS) $(SRCS) -o $(OBJ_PATH)/firmware
 
