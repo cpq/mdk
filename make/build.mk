@@ -4,6 +4,7 @@ ARCH      ?= c3
 OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
 ESPTOOL   ?= esptool.py
+ESPUTIL   ?= $(ROOT_PATH)/tools/esputil
 TOOLCHAIN ?= riscv64-unknown-elf
 
 # -g3 pulls enums and defines into the debug info for GDB
@@ -64,15 +65,16 @@ $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
 
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 	$(ESPTOOL) --chip $(CHIP) elf2image -o $@ $<
+#	$(TOOLCHAIN)-objcopy -O binary $< $@
 
 flash: $(OBJ_PATH)/$(PROG).bin
-	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect \
-    $(BLOFFSET) $(ROOT_PATH)/src/boot/bootloader_$(ARCH)$(CHIP_REV).bin \
-    0x08000 $(ROOT_PATH)/src/boot/partitions.bin \
-    0x10000 $?
+	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect $(BLOFFSET) $?
 
 monitor:
-	python3 $$(find ~/.espressif/ -name miniterm.py | head -1) $(PORT) 115200
+	$(ESPUTIL) -p $(PORT) monitor
+
+$(ESPUTIL): $(ROOT_PATH)/tools/esputil.c
+	make -C $(ROOT_PATH)/tools esputil
 
 clean:
 	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(OBJ_PATH)

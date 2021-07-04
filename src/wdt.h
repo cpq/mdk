@@ -7,6 +7,13 @@
 static inline void wdt_disable(void) {
   RTC_CNTL_WDTWPROTECT_REG[0] = 0x50d83aa1;  // Disable write protection
   RTC_CNTL_WDTCONFIG0_REG[0] &= BIT(31);     // Disable RTC WDT
+
+  // bootloader_super_wdt_auto_feed()
+  REG(C3_RTCCNTL)[44] = 0x8F1D312A;
+  REG(C3_RTCCNTL)[43] |= BIT(31);
+  REG(C3_RTCCNTL)[45] = 0;
+
+  REG(C3_TIMERGROUP0)[18] &= BIT(31);  // Disable WDT
 }
 #elif defined(ESP32)
 #define RTC_CNTL_WDTCONFIG0_REG REG(0X3ff4808c)
