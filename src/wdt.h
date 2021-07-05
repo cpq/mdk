@@ -13,7 +13,7 @@ static inline void wdt_disable(void) {
   REG(C3_RTCCNTL)[43] |= BIT(31);
   REG(C3_RTCCNTL)[45] = 0;
 
-  REG(C3_TIMERGROUP0)[18] &= BIT(31);  // Disable WDT
+  REG(C3_TIMERGROUP0)[18] &= BIT(31);  // Disable TIMG0 WDT
 }
 #elif defined(ESP32)
 #define RTC_CNTL_WDTCONFIG0_REG REG(0X3ff4808c)

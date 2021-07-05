@@ -135,15 +135,6 @@ This SDK aims to be ESP-IDF independent, however at this moment the following
 dependencies are present:
 
 - esptool.py script for flashing firmware and preparing image files
-- `boot/bootloader_*.bin` - 2nd stage bootloader
-- `boot/partitions.bin` - a partition table (see below)
-
-```csv
-nvs,      data, nvs,     0x9000,    20K,
-app0,     app,  ota_0,   0x10000,   1280K,
-app1,     app,  ota_1,   ,          1280K,
-spiffs,   data, spiffs,  ,          1M,
-```
 
 # UNIX mode
 
