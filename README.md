@@ -1,6 +1,6 @@
 # ESP32 SDK
 
-This is an alternative, make-based, bare metal SDK for the ESP32 chip.
+An alternative, make-based, bare metal SDK for the ESP32, ESP32C3 chips.
 It aims to be completely independent from the ESP-IDF (see dependencies
 section below), and based on a Technical Reference Manuals:
 [ESP32 C3 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf),
@@ -10,6 +10,7 @@ section below), and based on a Technical Reference Manuals:
 # Environment setup
 
 Required tools:
+- MacOS or Linux operating system
 - Esptool. Download from [esptool.py](https://raw.githubusercontent.com/espressif/esptool/master/esptool.py)
 - GCC crosscompiler for riscv 32-bit:
    - MacOS (takes time):
@@ -22,18 +23,7 @@ Required tools:
       $ sudo apt-get install -y gcc-riscv64-linux-gnu
       ```
 
-If all of your installs are inthe default locations, you can simply use the
-built-in `export.sh` located in `tools`.
-
-```sh
-$ . tools/export.sh c3 r0
-```
-
-for example, where c3 is the chip type, and r0 is the chip rev, chip rev is
-optional.
-
-Alternatively, you can manually setup the environment by exporting the
-following environment variables:
+Export the following environment variables:
 
 ```sh
 $ export ARCH=c3                        # Choices: c3, esp32
@@ -42,16 +32,16 @@ $ export ESPTOOL=/path/to/esptool.py    # Full path to esptool.py
 $ export PORT=/dev/ttyUSB0              # Serial port for flashing
 ```
 
-Verify setup by running GCC:
+Verify setup by building and flashing blinky example firmware.
+From repository root, execute:
 
 ```sh
-$ $TOOLCHAIN-gcc --help
-Usage: riscv32-esp-elf-gcc [options] file...
+$ make -C examples/blinky clean build flash monitor
 ```
 
-# Project build
+# Firmware Makefile
 
-Project Makefile should look like this:
+Firmware Makefile should look like this:
 
 ```make
 SOURCES = main.c another_file.c
@@ -62,12 +52,45 @@ EXTRA_LINKFLAGS ?=
 include $(SDK_PATH)/make/build.mk
 ```
 
-- Build one example: `make -C examples/blinky clean build flash monitor`
-- Build all examples: `make -C tools test examples clean`
+# Environment reference
+
+Environment / Makefile variables:
+
+| Name | Description |
+| ---- | ----------- |
+| ARCH | Architecture. Possible values: c3, esp32 |
+| TOOLCHAIN | GCC binary prefix |
+| PORT | Serial port |
+| EXTRA\_CFLAGS | Extra compiler flags |
+| EXTRA\_LINKFLAGS | Extra linker flags |
+
+Makefile targets:
+
+| Name | Description | 
+| ---- | ----------- |
+| clean | Clean up build artifacts |
+| build | Build firmware in a project's `build/` directory |
+| flash | Flash firmware. Needs PORT variable set |
+| monitor | Run serial monitor. Needs PORT variable set |
+| unix | Build Mac/Linux executable firmware, see "UNIX mode" section below |
+
+
+Preprocessor definitions
+
+| Name | Description | 
+| ---- | ----------- |
+| LED1 | User LED pin. Default: 2 |
+| BTN1 | User button pin. Default: 9 |
+
 
 # API reference
 
-All API are implemented from scratch using datasheet.
+API support matrix:
+
+| Name    | GPIO | SPI | I2C | UART | WiFi | Timer | System |
+| ----    | ---- | --- | --- | ---- | ---- | ----- | ------ |
+| ESP32C3 | yes  | yes |  -  |  yes |  -   |  yes  |  yes   |
+| ESP32   | yes  | yes |  -  |  -   |  -   |  yes  |  yes   |
 
 - GPIO
   ```c
@@ -128,6 +151,7 @@ All API are implemented from scratch using datasheet.
   void sdk_hexdump(const void *buf, size_t len);  // Hexdump buffer
   ```
 - TCP/IP
+
 
 # ESP-IDF dependencies
 

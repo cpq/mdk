@@ -68,7 +68,8 @@ $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 #	$(TOOLCHAIN)-objcopy -O binary $< $@
 
 flash: $(OBJ_PATH)/$(PROG).bin
-	$(ESPUTIL) -p $(PORT) flash $(BLOFFSET) $?
+	$(ESPUTIL) $(ESPUTILOPTS) -p $(PORT) flash $(BLOFFSET) $?
+#	$(ESPTOOL) --no-stub --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) write_flash $(BLOFFSET) $?
 #	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect $(BLOFFSET) $?
 
 monitor:

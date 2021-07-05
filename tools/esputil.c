@@ -18,6 +18,12 @@
 
 #include "slip.h"  // SLIP state machine logic
 
+#define CHIP_ID_ESP32 0x00f01d83
+#define CHIP_ID_ESP32_S2 0x000007c6
+#define CHIP_ID_ESP32_C3_ECO_1_2 0x6921506f
+#define CHIP_ID_ESP32_C3_ECO3 0x1b31506f
+#define CHIP_ID_ESP8266 0xfff0c101
+
 static int s_signo;
 
 void signal_handler(int signo) {
@@ -99,16 +105,37 @@ static void usage(const char *progname, const char *baud, const char *port) {
       progname, baud, port);
 }
 
-static void chip_reset(int fd) {
-  int v;
-  v = TIOCM_DTR, ioctl(fd, TIOCMBIC, &v);  // DTR -> false: IO0 -> HIGH
-  v = TIOCM_RTS, ioctl(fd, TIOCMBIS, &v);  // RTS -> true: EN -> LOW
-  usleep(1 * 1000);
-  v = TIOCM_DTR, ioctl(fd, TIOCMBIS, &v);  // DTR -> true: IO0 -> LOW
-  v = TIOCM_RTS, ioctl(fd, TIOCMBIC, &v);  // RTS -> false: EN -> HIGH
-  usleep(50 * 1000);
-  v = TIOCM_DTR, ioctl(fd, TIOCMBIC, &v);  // DTR -> false: IO0 -> HIGH
-  tcflush(fd, TCIOFLUSH);                  // Discard all data
+static void set_rts(int fd, bool value) {
+  int v = TIOCM_RTS;
+  ioctl(fd, value ? TIOCMBIS : TIOCMBIC, &v);
+}
+
+static void set_dtr(int fd, bool value) {
+  int v = TIOCM_DTR;
+  ioctl(fd, value ? TIOCMBIS : TIOCMBIC, &v);
+}
+
+static void flushio(int fd) {
+  tcflush(fd, TCIOFLUSH);
+}
+
+static void hard_reset(int fd) {
+  set_dtr(fd, false);  // IO0 -> HIGH
+  set_rts(fd, true);   // EN -> LOW
+  usleep(100 * 1000);  // Wait
+  set_rts(fd, false);  // EN -> HIGH
+}
+
+static void reset_to_bootloader(int fd) {
+  usleep(100 * 1000);  // Wait
+  set_dtr(fd, false);  // IO0 -> HIGH
+  set_rts(fd, true);   // EN -> LOW
+  usleep(100 * 1000);  // Wait
+  set_dtr(fd, true);   // IO0 -> LOW
+  set_rts(fd, false);  // EN -> HIGH
+  usleep(50 * 1000);   // Wait
+  set_dtr(fd, false);  // IO0 -> HIGH
+  flushio(fd);         // Discard all data
 }
 
 static fd_set iowait(int fd, int ms) {
@@ -129,10 +156,9 @@ uint8_t checksum(const uint8_t *buf, size_t len) {
 
 // Execute serial command.
 // Return 0 on sucess, or error code on failure
-static int cmd(uint8_t op, void *buf, uint16_t len, struct slip *slip,
-               int timeout_ms, int fd, bool verbose) {
+static int cmd(uint8_t op, void *buf, uint16_t len, uint32_t cs,
+               struct slip *slip, int timeout_ms, int fd, bool verbose) {
   uint8_t tmp[8 + 16384];            // 8 is size of the header
-  uint32_t cs = checksum(buf, len);  // Calculate checksum
   memset(tmp, 0, 8);                 // Clear header
   tmp[1] = op;                       // Operation
   memcpy(&tmp[2], &len, 2);          // Length
@@ -153,35 +179,30 @@ static int cmd(uint8_t op, void *buf, uint16_t len, struct slip *slip,
     if (r == 0) continue;
     if (verbose) dump("R", slip->buf, r);
     if (slip->buf[0] != 1 || slip->buf[1] != op) continue;
-    if (r >= 12 && slip->buf[r - 4] != 0) return slip->buf[r - 3];
+    if (r >= 10 && slip->buf[r - 2] != 0) return slip->buf[r - 1];  // esp8266
+    if (r >= 12 && slip->buf[r - 4] != 0) return slip->buf[r - 3];  // esp32
     return 0;
   }
   return 2;
 }
 
 static int read_reg(struct slip *slip, int fd, bool verbose, uint32_t addr) {
-  return cmd(10, &addr, sizeof(addr), slip, 200, fd, verbose);
+  return cmd(10, &addr, sizeof(addr), 0, slip, 200, fd, verbose);
 }
-
-#if 0
-static int write_reg(struct slip *slip, int fd, bool verbose, uint32_t addr,
-                      uint32_t val, uint32_t mask, uint32_t delay_us) {
-  uint32_t data[] = {addr, val, mask, delay_us};
-  return cmd(9, data, sizeof(data), slip, 200, fd, verbose);
-}
-#endif
 
 // Assume chip is rebooted and is in download mode.
 // Send SYNC commands until success
 static bool chip_connect(struct slip *slip, int fd, bool verbose) {
+  reset_to_bootloader(fd);
   for (int i = 0; i < 50; i++) {
     uint8_t data[36] = {7, 7, 0x12, 0x20};
     memset(data + 4, 0x55, sizeof(data) - 4);
-    if (cmd(8, data, sizeof(data), slip, 250, fd, verbose) == 0) {
+    if (cmd(8, data, sizeof(data), 0, slip, 250, fd, verbose) == 0) {
       usleep(50 * 1000);
-      tcflush(fd, TCIOFLUSH);  // Discard all data
+      flushio(fd);  // Discard all data
       return true;
     }
+    flushio(fd);
   }
   return false;
 }
@@ -209,50 +230,82 @@ static void monitor(struct slip *slip, int fd, bool verbose) {
 }
 
 static const char *chip_id_to_str(uint32_t id) {
-  if (id == 0x00f01d83) return "ESP32";
-  if (id == 0x000007c6) return "ESP32-S2";
-  if (id == 0x6921506f) return "ESP32-C3-ECO1+2";
-  if (id == 0x1b31506f) return "ESP32-C3-ECO3";
-  if (id == 0xfff0c101) return "ESP8266";
+  if (id == CHIP_ID_ESP32) return "ESP32";
+  if (id == CHIP_ID_ESP32_S2) return "ESP32-S2";
+  if (id == CHIP_ID_ESP32_C3_ECO_1_2) return "ESP32-C3-ECO1+2";
+  if (id == CHIP_ID_ESP32_C3_ECO3) return "ESP32-C3-ECO3";
+  if (id == CHIP_ID_ESP8266) return "ESP8266";
   return "Unknown";
 }
 
 static void info(struct slip *slip, int fd, bool verbose) {
-  chip_reset(fd);
   if (!chip_connect(slip, fd, verbose)) fail("Error connecting\n");
   if (read_reg(slip, fd, verbose, 0x40001000)) fail("Error reading ID\n");
   uint32_t id = *(uint32_t *) &slip->buf[4];
   printf("Chip ID: 0x%x (%s)\n", id, chip_id_to_str(id));
+
+  if (id == CHIP_ID_ESP32_C3_ECO3) {
+    uint32_t efuse_base = 0x60008800;
+    read_reg(slip, fd, verbose, efuse_base + 0x44);
+    uint32_t mac0 = *(uint32_t *) &slip->buf[4];
+    read_reg(slip, fd, verbose, efuse_base + 0x48);
+    uint32_t mac1 = *(uint32_t *) &slip->buf[4];
+    printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", (mac1 >> 8) & 255,
+           mac1 & 255, (mac0 >> 24) & 255, (mac0 >> 16) & 255,
+           (mac0 >> 8) & 255, mac0 & 255);
+  }
 }
 
 static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
-  chip_reset(fd);
   if (!chip_connect(slip, fd, verbose)) fail("Error connecting\n");
 
-  // Iterate over arguments
+  if (read_reg(slip, fd, verbose, 0x40001000)) fail("Error reading ID\n");
+  uint32_t chip_id = *(uint32_t *) &slip->buf[4];
+
+  // Iterate over arguments: FLASH_OFFSET FILENAME ...
   while (args[0] && args[1]) {
-    uint32_t addr = strtoul(args[0], NULL, 0);
+    uint32_t flash_offset = strtoul(args[0], NULL, 0);
     FILE *fp = fopen(args[1], "rb");
     if (fp == NULL) fail("Cannot open %s: %s\n", args[1], strerror(errno));
     fseek(fp, 0, SEEK_END);
     int seq = 0, n, size = ftell(fp);
     rewind(fp);
 
-    uint8_t buf[1024];
+    // For non-ESP8266, SPI attach is mandatory
+    if (chip_id != CHIP_ID_ESP8266) {
+      uint32_t d3[] = {0, 0};
+      if (cmd(13, d3, sizeof(d3), 0, slip, 250, fd, verbose))
+        fail("SPI attach failed\n");
+    }
 
-    // Flash begin
-    uint32_t num_blocks = (size + sizeof(buf) - 1) / sizeof(buf);
-    uint32_t d1[] = {size, num_blocks, sizeof(buf), addr};
-    if (cmd(2, d1, sizeof(d1), slip, 500, fd, verbose))
+    uint32_t block_size = 4096, hs = 16;
+    uint8_t buf[hs + block_size];  // Initial 16 bytes are for serial cmd
+    memset(buf, 0, hs);            // Clear them
+
+    // Flash begin. S2, S3, C3 chips have an extra 5th parameter.
+    uint32_t encrypted = 0;
+    uint32_t num_blocks = (size + block_size - 1) / block_size;
+    uint32_t d1[] = {size, num_blocks, block_size, flash_offset, encrypted};
+    uint16_t d1size = sizeof(d1) - 4;
+    if (chip_id == CHIP_ID_ESP32_S2 || chip_id == CHIP_ID_ESP32_C3_ECO3)
+      d1size += 4;
+    if (cmd(2, d1, d1size, 0, slip, 500, fd, verbose))
       fail("flash_begin failed\n");
 
-    while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
+    // Read from file into a buffer, but skip initial 16 bytes
+    while ((n = fread(buf + hs, 1, block_size, fp)) > 0) {
       int oft = ftell(fp);
-      printf("Writing %d @ 0x%x (%d%%)\n", n, addr + oft - n, oft * 100 / size);
+      printf("Writing %d @ 0x%x (%d%%)\n", n, flash_offset + oft - n,
+             oft * 100 / size);
+
+      // Embed flash params into an image
+      // TODO(cpq): don't hardcode, detect them
+      if (seq == 0) buf[hs + 2] = 0x2, buf[hs + 3] = 0x20;
 
       // Flash write
-      uint32_t d2[] = {n, seq++, 0, 0};
-      if (cmd(3, d2, sizeof(d2), slip, 1500, fd, verbose))
+      *(uint32_t *) &buf[0] = n;      // Populate initial bytes - size
+      *(uint32_t *) &buf[4] = seq++;  // And sequence numner
+      if (cmd(3, buf, hs + n, checksum(buf + hs, n), slip, 1500, fd, verbose))
         fail("flash_data failed\n");
     }
 
@@ -262,7 +315,10 @@ static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
 
   // Flash end
   uint32_t d3[] = {0};  // 0: reboot, 1: run user code
-  cmd(4, d3, sizeof(d3), slip, 250, fd, verbose);
+  if (cmd(4, d3, sizeof(d3), 0, slip, 250, fd, verbose))
+    fail("flash_end failed\n");
+
+  hard_reset(fd);
 }
 
 int main(int argc, const char **argv) {

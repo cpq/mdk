@@ -180,7 +180,7 @@ static uint16_t mkfcs(const uint8_t *buf, size_t len) {
       v = ((v ^ c) & 1) ? (v >> 1) ^ 0x8408 : v >> 1, c >>= 1;
     }
   }
-  return ~v;
+  return (uint16_t) ~v;
 }
 
 static size_t ppp_encode(uint8_t *src, size_t len, uint8_t *dst) {

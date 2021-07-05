@@ -11,7 +11,7 @@ static void logs(const char *buf, size_t len) {
 }
 
 static unsigned char nibble(unsigned char c) {
-  return c < 10 ? c + '0' : c + 'W';
+  return (unsigned char) (c < 10 ? c + '0' : c + 'W');
 }
 
 #define ISPRINT(x) ((x) >= ' ' && (x) <= '~')
