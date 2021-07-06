@@ -256,7 +256,8 @@ static void info(struct slip *slip, int fd, bool verbose) {
   }
 }
 
-static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
+static int flash(struct slip *slip, int fd, bool verbose, const char **args) {
+  int args_consumed = 0;
   if (!chip_connect(slip, fd, verbose)) fail("Error connecting\n");
 
   if (read_reg(slip, fd, verbose, 0x40001000)) fail("Error reading ID\n");
@@ -310,6 +311,7 @@ static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
     }
 
     fclose(fp);
+    args_consumed += 2;
     args += 2;
   }
 
@@ -319,6 +321,7 @@ static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
     fail("flash_end failed\n");
 
   hard_reset(fd);
+  return args_consumed;
 }
 
 int main(int argc, const char **argv) {
@@ -342,7 +345,6 @@ int main(int argc, const char **argv) {
       break;
     }
   }
-  if (command == NULL) usage(argv[0], baud, port);
 
   int fd = open_serial(port, atoi(baud), verbose);
   signal(SIGINT, signal_handler);
@@ -352,15 +354,18 @@ int main(int argc, const char **argv) {
   uint8_t slipbuf[32 * 1024];
   struct slip slip = {.buf = slipbuf, .size = sizeof(slipbuf)};
 
-  if (strcmp(*command, "info") == 0) {
-    info(&slip, fd, verbose);
-  } else if (strcmp(*command, "flash") == 0) {
-    flash(&slip, fd, verbose, &command[1]);
-  } else if (strcmp(*command, "monitor") == 0) {
-    while (s_signo == 0) monitor(&slip, fd, verbose);
-  } else {
-    printf("Unknown command: %s\n", *command);
-    usage(argv[0], baud, port);
+  while (command != NULL && *command != NULL) {
+    if (strcmp(*command, "info") == 0) {
+      info(&slip, fd, verbose);
+    } else if (strcmp(*command, "flash") == 0) {
+      command += flash(&slip, fd, verbose, &command[1]);
+    } else if (strcmp(*command, "monitor") == 0) {
+      while (s_signo == 0) monitor(&slip, fd, verbose);
+    } else {
+      printf("Unknown command: %s\n", *command);
+      usage(argv[0], baud, port);
+    }
+    command++;
   }
   close(fd);
   return 0;

@@ -1,18 +1,18 @@
 # ESP32 SDK
 
 An alternative, make-based, bare metal SDK for the ESP32, ESP32C3 chips.
-It aims to be completely independent from the ESP-IDF (see dependencies
-section below), and based on a Technical Reference Manuals:
+It is written from scratch using datasheets (
 [ESP32 C3 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf),
 [ESP32 TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)
-.
+).
+It is completely independent from the ESP-IDF SDK and does not use any
+ESP-IDF tools or files.
 
 # Environment setup
 
-Required tools:
+Required tools: 
 - MacOS or Linux operating system
-- Esptool. Download from [esptool.py](https://raw.githubusercontent.com/espressif/esptool/master/esptool.py)
-- GCC crosscompiler for riscv 32-bit:
+- For ESP32C3, a 32-bit riscv GCC crosscompiler is required:
    - MacOS (takes time):
       ```sh
       $ brew tap riscv/riscv
@@ -28,7 +28,6 @@ Export the following environment variables:
 ```sh
 $ export ARCH=c3                        # Choices: c3, esp32
 $ export TOOLCHAIN=riscv64-unknown-elf  # $TOOLCHAIN-gcc must resolve to GCC
-$ export ESPTOOL=/path/to/esptool.py    # Full path to esptool.py
 $ export PORT=/dev/ttyUSB0              # Serial port for flashing
 ```
 
@@ -152,13 +151,6 @@ API support matrix:
   ```
 - TCP/IP
 
-
-# ESP-IDF dependencies
-
-This SDK aims to be ESP-IDF independent, however at this moment the following
-dependencies are present:
-
-- esptool.py script for flashing firmware and preparing image files
 
 # UNIX mode
 

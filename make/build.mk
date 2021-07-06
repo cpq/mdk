@@ -3,7 +3,6 @@ ROOT_PATH ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 ARCH      ?= c3
 OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
-ESPTOOL   ?= esptool.py
 ESPUTIL   ?= $(ROOT_PATH)/tools/esputil
 TOOLCHAIN ?= riscv64-unknown-elf
 
@@ -21,17 +20,11 @@ LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/make/$(ARCH).ld -nostdlib -nostartfiles 
 ifeq "$(ARCH)" "c3"
 MCUFLAGS  ?= -march=rv32imc -mabi=ilp32 -DESP32C3
 WARNFLAGS ?= -Wformat-truncation
-BLOFFSET  ?= 0
-CHIP      ?= esp32c3
+BLOFFSET  ?= 0  # 2nd stage bootloader flash offset
 else 
 MCUFLAGS  ?= -mlongcalls -mtext-section-literals -DESP32
-BLOFFSET  ?= 0x1000
-CHIP      ?= esp32
+BLOFFSET  ?= 0x1000  # 2nd stage bootloader flash offset
 endif
-
-# Most chips don't need a specific rev.
-CHIP_REV?=
-FLASH_BAUD?=115200
 
 SOURCES += $(ROOT_PATH)/src/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
@@ -63,16 +56,35 @@ $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
 	$(TOOLCHAIN)-gcc -Xlinker $(OBJECTS) $(LINKFLAGS) -o $@
 	$(TOOLCHAIN)-size $@
 
+# Extract section from the .elf file. Save offset, then size, then content
+# TODO(cpq): make esputil generate the code
+define savesection
+	$(TOOLCHAIN)-objcopy -O binary --only-section $3 $1 $(OBJ_PATH)/.tmp.bin
+	$(TOOLCHAIN)-objdump -h $1 | grep $3 | tr -s ' ' | cut -d ' ' -f 5 | xxd -r -p | od -An -X | xxd -r -p >> $2
+	$(TOOLCHAIN)-objdump -h $1 | grep $3 | tr -s ' ' | cut -d ' ' -f 4 | xxd -r -p | od -An -X | xxd -r -p >> $2
+	cat $(OBJ_PATH)/.tmp.bin >> $2
+endef
+
+# Pad file $1 to a given alignment $2
+# NUM = ALIGN - (FILE_SIZE % ALIGN); head -c NUM /dev/zero >> FILE
+define addpadding
+	head -c $$(echo "$2-($$(ls -l $1 | tr -s ' ' | cut -d ' ' -f5) % 16)"  | bc) /dev/zero >> $1
+endef
+
+# Generate flashable .bin image from the .elf file
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
-	$(ESPTOOL) --chip $(CHIP) elf2image -o $@ $<
-#	$(TOOLCHAIN)-objcopy -O binary $< $@
+	echo e9030000 | xxd -r -p > $@ # Image header, 3 sections, flash params = 0
+	$(TOOLCHAIN)-nm $< | grep 'T _reset' | cut -f1 -dT | xxd -r -p | od -An -X | xxd -r -p >> $@ # Entry point address, _reset. Using od for little endian
+	echo ee000000000000000000000000000001 | xxd -r -p >> $@ # What's that ??
+	$(call savesection,$<,$@,.data)
+	$(call savesection,$<,$@,.text)
+	$(call savesection,$<,$@,.rodata)
+	$(call addpadding,$@,16)
 
-flash: $(OBJ_PATH)/$(PROG).bin
-	$(ESPUTIL) $(ESPUTILOPTS) -p $(PORT) flash $(BLOFFSET) $?
-#	$(ESPTOOL) --no-stub --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) write_flash $(BLOFFSET) $?
-#	$(ESPTOOL) --chip $(CHIP) --port $(PORT) --baud $(FLASH_BAUD) --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect $(BLOFFSET) $?
+flash: $(OBJ_PATH)/$(PROG).bin $(ESPUTIL)
+	$(ESPUTIL) -p $(PORT) flash $(BLOFFSET) $(OBJ_PATH)/$(PROG).bin
 
-monitor:
+monitor: $(ESPUTIL)
 	$(ESPUTIL) -p $(PORT) monitor
 
 $(ESPUTIL): $(ROOT_PATH)/tools/esputil.c
