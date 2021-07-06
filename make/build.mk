@@ -1,28 +1,29 @@
 PROG      ?= firmware
 ROOT_PATH ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
-ARCH      ?= c3
+ARCH      ?= ESP32C3
 OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
 ESPUTIL   ?= $(ROOT_PATH)/tools/esputil
-TOOLCHAIN ?= riscv64-unknown-elf
 
 # -g3 pulls enums and defines into the debug info for GDB
 # -ffunction-sections -fdata-sections, -Wl,--gc-sections remove unused code
 # strict WARNFLAGS protect from stupid mistakes
 
 DEFS      ?=
-INCLUDES  ?= -I. -I$(ROOT_PATH)/src
+INCLUDES  ?= -I. -I$(ROOT_PATH)/src -D$(ARCH)
 WARNFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
 OPTFLAGS  ?= -Os -g3 -ffunction-sections -fdata-sections
 CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(EXTRA_CFLAGS)
 LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
 
-ifeq "$(ARCH)" "c3"
-MCUFLAGS  ?= -march=rv32imc -mabi=ilp32 -DESP32C3
+ifeq "$(ARCH)" "ESP32C3"
+TOOLCHAIN ?= riscv64-unknown-elf
+MCUFLAGS  ?= -march=rv32imc -mabi=ilp32
 WARNFLAGS ?= -Wformat-truncation
 BLOFFSET  ?= 0  # 2nd stage bootloader flash offset
 else 
-MCUFLAGS  ?= -mlongcalls -mtext-section-literals -DESP32
+TOOLCHAIN ?= xtensa-esp32-elf
+MCUFLAGS  ?= -mlongcalls -mtext-section-literals
 BLOFFSET  ?= 0x1000  # 2nd stage bootloader flash offset
 endif
 
@@ -56,30 +57,16 @@ $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
 	$(TOOLCHAIN)-gcc -Xlinker $(OBJECTS) $(LINKFLAGS) -o $@
 	$(TOOLCHAIN)-size $@
 
-# Extract section from the .elf file. Save offset, then size, then content
-# TODO(cpq): make esputil generate the code
-define savesection
-	$(TOOLCHAIN)-objcopy -O binary --only-section $3 $1 $(OBJ_PATH)/.tmp.bin
-	$(TOOLCHAIN)-objdump -h $1 | grep $3 | tr -s ' ' | cut -d ' ' -f 5 | xxd -r -p | od -An -X | xxd -r -p >> $2
-	$(TOOLCHAIN)-objdump -h $1 | grep $3 | tr -s ' ' | cut -d ' ' -f 4 | xxd -r -p | od -An -X | xxd -r -p >> $2
-	cat $(OBJ_PATH)/.tmp.bin >> $2
-endef
+# elf_section_load_address FILE,SECTION_NAME
+elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep $2 | tr -s ' ' | cut -d ' ' -f 5)
 
-# Pad file $1 to a given alignment $2
-# NUM = ALIGN - (FILE_SIZE % ALIGN); head -c NUM /dev/zero >> FILE
-define addpadding
-	head -c $$(echo "$2-($$(ls -l $1 | tr -s ' ' | cut -d ' ' -f5) % 16)"  | bc) /dev/zero >> $1
-endef
+# elf_symbol_address FILE,SYMBOL
+elf_entry_point_address = $(shell $(TOOLCHAIN)-nm $1 | grep 'T $2' | cut -f1 -dT)
 
-# Generate flashable .bin image from the .elf file
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
-	echo e9030000 | xxd -r -p > $@ # Image header, 3 sections, flash params = 0
-	$(TOOLCHAIN)-nm $< | grep 'T _reset' | cut -f1 -dT | xxd -r -p | od -An -X | xxd -r -p >> $@ # Entry point address, _reset. Using od for little endian
-	echo ee000000000000000000000000000001 | xxd -r -p >> $@ # What's that ??
-	$(call savesection,$<,$@,.data)
-	$(call savesection,$<,$@,.text)
-	$(call savesection,$<,$@,.rodata)
-	$(call addpadding,$@,16)
+	$(TOOLCHAIN)-objcopy -O binary --only-section .text $< $(OBJ_PATH)/.text.bin
+	$(TOOLCHAIN)-objcopy -O binary --only-section .data $< $(OBJ_PATH)/.data.bin
+	$(ESPUTIL) mkbin $@ $(call elf_entry_point_address,$<,_reset) $(call elf_section_load_address,$<,.data) $(OBJ_PATH)/.data.bin $(call elf_section_load_address,$<,.text) $(OBJ_PATH)/.text.bin
 
 flash: $(OBJ_PATH)/$(PROG).bin $(ESPUTIL)
 	$(ESPUTIL) -p $(PORT) flash $(BLOFFSET) $(OBJ_PATH)/$(PROG).bin

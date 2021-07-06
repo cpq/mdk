@@ -100,7 +100,8 @@ static void usage(const char *progname, const char *baud, const char *port) {
       "  -v\t\t - be verbose, hexdump serial data\n"
       "COMMAND:\n"
       "  info\t\t - show ESP chip info\n"
-      "  flash A F ...\t - flash binary file F at flash offset A\n"
+      "  flash O B ...\t - flash binary file B at flash offset O\n"
+      "  mkbin B E A F ...\t - create image B, entry E, address A, file F\n"
       "",
       progname, baud, port);
 }
@@ -148,10 +149,13 @@ static fd_set iowait(int fd, int ms) {
   return rset;
 }
 
-uint8_t checksum(const uint8_t *buf, size_t len) {
-  uint8_t v = 0xef;
+uint8_t checksum2(uint8_t v, const uint8_t *buf, size_t len) {
   while (len--) v ^= *buf++;
   return v;
+}
+
+uint8_t checksum(const uint8_t *buf, size_t len) {
+  return checksum2(0xef, buf, len);
 }
 
 // Execute serial command.
@@ -256,8 +260,7 @@ static void info(struct slip *slip, int fd, bool verbose) {
   }
 }
 
-static int flash(struct slip *slip, int fd, bool verbose, const char **args) {
-  int args_consumed = 0;
+static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
   if (!chip_connect(slip, fd, verbose)) fail("Error connecting\n");
 
   if (read_reg(slip, fd, verbose, 0x40001000)) fail("Error reading ID\n");
@@ -311,7 +314,6 @@ static int flash(struct slip *slip, int fd, bool verbose, const char **args) {
     }
 
     fclose(fp);
-    args_consumed += 2;
     args += 2;
   }
 
@@ -321,7 +323,62 @@ static int flash(struct slip *slip, int fd, bool verbose, const char **args) {
     fail("flash_end failed\n");
 
   hard_reset(fd);
-  return args_consumed;
+}
+
+static unsigned long align_to(unsigned long n, unsigned to) {
+  return ((n + to - 1) / to) * to;
+}
+
+static void mkbin(const char *bin_path, const char *ep, const char *args[]) {
+  FILE *bin_fp = fopen(bin_path, "w+b");
+  if (bin_fp == NULL) fail("Cannot open %s: %s\n", bin_path, strerror(errno));
+  uint32_t entrypoint = strtoul(ep, NULL, 16);
+
+  uint8_t num_segments = 0;
+  while (args[num_segments * 2] && args[num_segments * 2 + 1]) num_segments++;
+
+  // Write common header
+  uint8_t common_hdr[] = {0xe9, num_segments, 0, 0};
+  fwrite(common_hdr, 1, sizeof(common_hdr), bin_fp);
+
+  // Entry point
+  fwrite(&entrypoint, 1, sizeof(entrypoint), bin_fp);
+
+  // Extended header
+  uint8_t extended_hdr[] = {0xee, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+  fwrite(extended_hdr, 1, sizeof(extended_hdr), bin_fp);
+
+  uint8_t cs = 0xef, zero = 0;
+
+  // Iterate over segments
+  for (uint8_t i = 0; i < num_segments; i++) {
+    uint32_t load_address = strtoul(args[i * 2], NULL, 16);
+    FILE *fp = fopen(args[i * 2 + 1], "rb");
+    if (fp == NULL) fail("Cannot open %s: %d\n", args[i * 2 + 1], errno);
+    fseek(fp, 0, SEEK_END);
+    uint32_t size = ftell(fp);
+    rewind(fp);
+    uint32_t aligned_size = align_to(size, 4);
+
+    fwrite(&load_address, 1, sizeof(load_address), bin_fp);
+    fwrite(&aligned_size, 1, sizeof(aligned_size), bin_fp);
+
+    uint8_t buf[BUFSIZ];
+    int n;
+    while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
+      cs = checksum2(cs, buf, n);
+      fwrite(buf, 1, n, bin_fp);
+    }
+    fclose(fp);
+    for (uint8_t j = 0; j < aligned_size - size; j++) fputc(zero, bin_fp);
+  }
+
+  // Pad to 16 bytes and write checksum
+  long ofs = ftell(bin_fp), aligned_ofs = align_to(ofs + 1, 16);
+  for (uint8_t i = 0; i < aligned_ofs - ofs - 1; i++) fputc(zero, bin_fp);
+  fputc(cs, bin_fp);
+
+  fclose(bin_fp);
 }
 
 int main(int argc, const char **argv) {
@@ -346,6 +403,14 @@ int main(int argc, const char **argv) {
     }
   }
 
+  // Commands that do not require serial port
+  if (strcmp(*command, "mkbin") == 0) {
+    if (!command[1] || !command[2] || !command[3] || !command[4])
+      usage(argv[0], baud, port);
+    mkbin(command[1], command[2], &command[3]);
+    return 0;
+  }
+
   int fd = open_serial(port, atoi(baud), verbose);
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
@@ -354,18 +419,15 @@ int main(int argc, const char **argv) {
   uint8_t slipbuf[32 * 1024];
   struct slip slip = {.buf = slipbuf, .size = sizeof(slipbuf)};
 
-  while (command != NULL && *command != NULL) {
-    if (strcmp(*command, "info") == 0) {
-      info(&slip, fd, verbose);
-    } else if (strcmp(*command, "flash") == 0) {
-      command += flash(&slip, fd, verbose, &command[1]);
-    } else if (strcmp(*command, "monitor") == 0) {
-      while (s_signo == 0) monitor(&slip, fd, verbose);
-    } else {
-      printf("Unknown command: %s\n", *command);
-      usage(argv[0], baud, port);
-    }
-    command++;
+  if (strcmp(*command, "info") == 0) {
+    info(&slip, fd, verbose);
+  } else if (strcmp(*command, "flash") == 0) {
+    flash(&slip, fd, verbose, &command[1]);
+  } else if (strcmp(*command, "monitor") == 0) {
+    while (s_signo == 0) monitor(&slip, fd, verbose);
+  } else {
+    printf("Unknown command: %s\n", *command);
+    usage(argv[0], baud, port);
   }
   close(fd);
   return 0;
