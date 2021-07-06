@@ -346,6 +346,7 @@ static void mkbin(const char *bin_path, const char *ep, const char *args[]) {
 
   // Extended header
   uint8_t extended_hdr[] = {0xee, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+  if (entrypoint > 0x40380000) extended_hdr[4] = 5;  // ESP32C3. TODO(cpq): fix
   fwrite(extended_hdr, 1, sizeof(extended_hdr), bin_fp);
 
   uint8_t cs = 0xef, zero = 0;
