@@ -106,7 +106,7 @@ API support matrix:
   void gpio_toggle(int pin);              // Toggle pin value
   bool gpio_read(int pin);                // Read pin value
   ```
-- SPI [[src/spi.h](src/spi.h)]
+- SPI [[src/spi.h](src/spi.h)], [[src/spi.c](src/spi.c)]
   ```c
   // SPI descriptor. Specifies pins for MISO, MOSI, CLK and chip select
   struct spi { int miso, mosi, clk, cs[3]; };
