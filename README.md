@@ -98,7 +98,7 @@ API support matrix:
 | ESP32C3 | yes  | yes |  -  |  yes |  -   |  yes  |  yes   | -    |
 | ESP32   | yes  | yes |  -  |  -   |  -   |  yes  |  yes   | -    |
 
-- GPIO
+- GPIO [[src/gpio.h](src/gpio.h)]
   ```c
   void gpio_output(int pin);              // Set pin mode to OUTPUT
   void gpio_input(int pin);               // Set pin mode to INPUT
@@ -106,7 +106,7 @@ API support matrix:
   void gpio_toggle(int pin);              // Toggle pin value
   bool gpio_read(int pin);                // Read pin value
   ```
-- SPI (software bit-bang using GPIO API)
+- SPI [[src/spi.h](src/spi.h)]
   ```c
   // SPI descriptor. Specifies pins for MISO, MOSI, CLK and chip select
   struct spi { int miso, mosi, clk, cs[3]; };
@@ -116,18 +116,18 @@ API support matrix:
   void spi_end(struct spi *spi, int cs);    // End SPI transaction
   unsigned char spi_txn(struct spi *spi, unsigned char);   // Do SPI transaction
   ```
-- UART
+- UART [[src/uart.h](src/uart.h)], [[src/uart.c](src/uart.c)]
   ```c
   void uart_init(int no, int tx, int rx, int baud);   // Initialise UART
   bool uart_read(int no, uint8_t *c);   // Read byte. Return true on success
   void uart_write(int no, uint8_t c);   // Write byte. Block if FIFO is full
   ```
 - LEDC
-- WDT
+- WDT [[src/wdt.h](src/wdt.h)]
   ```c
   void wdt_disable(void);   // Disable watchdog
   ```
-- Timer
+- Timer [[src/timer.h](src/timer.h)]
   ```c
   struct timer {
     uint64_t period;       // Timer period in micros
@@ -140,7 +140,7 @@ API support matrix:
   #define TIMER_ADD(head_, p_, fn_, arg_)
   void timers_poll(struct timer *head, uint64_t now);
   ```
-- System
+- System  [[src/sys.h](src/sys.h)]
   ```c
   int sdk_ram_used(void);           // Return used RAM in bytes
   int sdk_ram_free(void);           // Return free RAM in bytes
@@ -149,7 +149,7 @@ API support matrix:
   void delay_ms(unsigned long ms);  // Block for "ms" milliseconds
   void spin(unsigned long count);   // Execute "count" no-op instructions
   ```
-- Log
+- Log [[src/log.h](src/log.h)], [[src/log.c](src/log.c)]
   ```c
   void sdk_log(const char *fmt, ...);   // Log message to UART 0
                                         // Supported specifiers:
