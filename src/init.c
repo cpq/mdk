@@ -52,9 +52,9 @@ static void clock_init(void) {
   ((void (*)(int)) 0x40000588)(160);  // ets_update_cpu_frequency(160)
 
   // Configure system clock timer, TRM 8.3.1, 8.9
-  TIMG0_REG[1] = TIMG0_REG[2] = 0UL;  // Reset LO and HI counter
-  TIMG0_REG[8] = 0;                   // Trigger reload
-  TIMG0_REG[0] = (83U << 13) | BIT(12) | BIT(29) | BIT(30) | BIT(31);
+  REG(C3_TIMERGROUP0)[1] = REG(C3_TIMERGROUP0)[2] = 0UL;  // Reset LO and HI
+  REG(C3_TIMERGROUP0)[8] = 0;                             // Trigger reload
+  REG(C3_TIMERGROUP0)[0] = (83U << 13) | BIT(12) | BIT(29) | BIT(30) | BIT(31);
 #endif
 }
 

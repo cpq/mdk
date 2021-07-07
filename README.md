@@ -10,7 +10,7 @@ ESP-IDF tools or files. The only tool required is a GCC crosscompiler.
 
 A screenshot below demonstrates a [examples/c3ws2812](examples/c3ws2812)
 RGB LED firmware flashed on a ESP32-C3-DevKitM-1 board. It takes < 2 seconds
-to perform firmware build and flash:
+for a full firmware rebuild and flash:
 
 ![](examples/c3ws2812/rainbow.gif)
 
@@ -93,10 +93,10 @@ Preprocessor definitions
 
 API support matrix:
 
-| Name    | GPIO | SPI | I2C | UART | WiFi | Timer | System |
-| ----    | ---- | --- | --- | ---- | ---- | ----- | ------ |
-| ESP32C3 | yes  | yes |  -  |  yes |  -   |  yes  |  yes   |
-| ESP32   | yes  | yes |  -  |  -   |  -   |  yes  |  yes   |
+| Name    | GPIO | SPI | I2C | UART | WiFi | Timer | System | RTOS |
+| ----    | ---- | --- | --- | ---- | ---- | ----- | ------ | ---- |
+| ESP32C3 | yes  | yes |  -  |  yes |  -   |  yes  |  yes   | -    |
+| ESP32   | yes  | yes |  -  |  -   |  -   |  yes  |  yes   | -    |
 
 - GPIO
   ```c

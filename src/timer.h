@@ -14,10 +14,11 @@ struct timer {
   struct timer *next;    // Linkage
 };
 
-#define TIMER_ADD(head_, p_, fn_, arg_)                                    \
-  do {                                                                     \
-    static struct timer t_ = {.period = (p_), .fn = (fn_), .arg = (arg_)}; \
-    LIST_ADD(head_, &t_);                                                  \
+#define TIMER_ADD(head_, p_, fn_, arg_)                     \
+  do {                                                      \
+    static struct timer t_ = {.period = (p_), .fn = (fn_)}; \
+    t_.arg = (arg_);                                        \
+    LIST_ADD(head_, &t_);                                   \
   } while (0)
 
 #define TIMER_DEL(head_, t_) LIST_DELETE(struct timer, head_, t_)
