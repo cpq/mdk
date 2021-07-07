@@ -5,8 +5,14 @@ It is written from scratch using datasheets (
 [ESP32 C3 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf),
 [ESP32 TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)
 ).
-It is completely independent from the ESP-IDF SDK and does not use any
-ESP-IDF tools or files.
+It is completely independent from the ESP-IDF and does not use any
+ESP-IDF tools or files. The only tool required is a GCC crosscompiler.
+
+A screenshot below demonstrates a [examples/c3ws2812](examples/c3ws2812)
+RGB LED firmware flashed on a ESP32-C3-DevKitM-1 board. It takes < 2 seconds
+to perform firmware build and flash:
+
+![](examples/c3ws2812/rainbow.gif)
 
 # Environment setup
 
