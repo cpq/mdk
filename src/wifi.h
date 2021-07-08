@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include "soc.h"
+
 #if defined(ESP32C3)
 static inline void wifi_get_mac_addr(uint8_t mac[6]) {
-  // PROVIDE(wifi_get_macaddr = 0x40001874);
-  for (int i = 0; i < 6; i++) mac[i] = 0;
-  ((void (*)(uint8_t[6]))(uintptr_t) 0x40001874)(mac);
+  uint32_t a = REG(C3_EFUSE)[17], b = REG(C3_EFUSE)[18];
+  mac[0] = (b >> 8) & 255, mac[1] = b & 255, mac[2] = (uint8_t)(a >> 24) & 255;
+  mac[3] = (a >> 16) & 255, mac[4] = (a >> 8) & 255, mac[5] = a & 255;
 }
 #elif defined(ESP32)
 #elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
