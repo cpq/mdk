@@ -1,6 +1,6 @@
-# ESP32 SDK
+# MDK (Minimal Development Kit) - a baremetal ESP32/ESP32C3 SDK
 
-An alternative, make-based, bare metal SDK for the ESP32, ESP32C3 chips.
+An bare metal, make-based SDK for the ESP32, ESP32C3 chips.
 It is written from scratch using datasheets (
 [ESP32 C3 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf),
 [ESP32 TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)
