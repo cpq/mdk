@@ -29,10 +29,12 @@ endif
 
 SOURCES += $(ROOT_PATH)/src/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
+HEADERS += $(wildcard $(ROOT_PATH)/src/*.h)
 _BJECTS = $(SOURCES:%.c=$(OBJ_PATH)/%.o)
 OBJECTS = $(_BJECTS:%.cpp=$(OBJ_PATH)/%.o)
 
 build: $(OBJ_PATH)/$(PROG).bin
+$(OBJECTS): $(HEADERS)
 
 unix: MCUFLAGS =
 unix: OPTFLAGS = -O0 -g3
