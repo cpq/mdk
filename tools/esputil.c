@@ -304,7 +304,12 @@ static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
 
       // Embed flash params into an image
       // TODO(cpq): don't hardcode, detect them
-      if (seq == 0) buf[hs + 2] = 0x2, buf[hs + 3] = 0x20;
+      if (seq == 0) {
+        buf[hs + 2] = 0x2, buf[hs + 3] = 0x20;
+        // Set chip type in the extended header at offset 4.
+        // Common header is 8, plus 4 bytes entry point, plus offset 4 = 16
+        if (chip_id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 16] = 5;
+      }
 
       // Flash write
       *(uint32_t *) &buf[0] = n;      // Populate initial bytes - size
@@ -346,7 +351,6 @@ static void mkbin(const char *bin_path, const char *ep, const char *args[]) {
 
   // Extended header
   uint8_t extended_hdr[] = {0xee, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-  if (entrypoint > 0x40380000) extended_hdr[4] = 5;  // ESP32C3. TODO(cpq): fix
   fwrite(extended_hdr, 1, sizeof(extended_hdr), bin_fp);
 
   uint8_t cs = 0xef, zero = 0;

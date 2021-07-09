@@ -15,7 +15,7 @@ int main(void) {
   // REG(C3_SYSCON)[5] |= 0xfb9fcf;  // Enable wifi clock
   // REG(C3_SYSCON)[6] &= ~0U;  // Reset
 
-  //((void (*)(void *)) 0x400414d2)(cb);  // ppRxPkt()
+  //((void (*)(void *, void *, void *)) 0x400414d2)(cb, 0, cb);  // ppRxPkt()
   //((void (*)(void *)) 0x4003dc40)(cb);  // lmacRxDone()
   //((void (*)(void *)) 0x40001720)(cb);  // ppTask()
 
