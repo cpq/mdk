@@ -1,21 +1,21 @@
 PROG      ?= firmware
-ROOT_PATH ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+MDK       ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 ARCH      ?= ESP32C3
 TOOLCHAIN ?= riscv64-unknown-elf
 OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
-ESPUTIL   ?= $(ROOT_PATH)/tools/esputil
+ESPUTIL   ?= $(MDK)/tools/esputil
 
 # -g3 pulls enums and defines into the debug info for GDB
 # -ffunction-sections -fdata-sections, -Wl,--gc-sections remove unused code
 # strict WARNFLAGS protect from stupid mistakes
 
 DEFS      ?=
-INCLUDES  ?= -I. -I$(ROOT_PATH)/src -D$(ARCH)
+INCLUDES  ?= -I. -I$(MDK)/src -D$(ARCH)
 WARNFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -fno-common -Wconversion
 OPTFLAGS  ?= -Os -g3 -ffunction-sections -fdata-sections
 CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(EXTRA_CFLAGS)
-LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
+LINKFLAGS ?= $(MCUFLAGS) -T$(MDK)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
 
 ifeq "$(ARCH)" "ESP32C3"
 MCUFLAGS  ?= -march=rv32imc -mabi=ilp32
@@ -26,9 +26,9 @@ MCUFLAGS  ?= -mlongcalls -mtext-section-literals
 BLOFFSET  ?= 0x1000  # 2nd stage bootloader flash offset
 endif
 
-SOURCES += $(ROOT_PATH)/src/boot/boot_$(ARCH).s
-SOURCES += $(wildcard $(ROOT_PATH)/src/*.c)
-HEADERS += $(wildcard $(ROOT_PATH)/src/*.h)
+SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
+SOURCES += $(wildcard $(MDK)/src/*.c)
+HEADERS += $(wildcard $(MDK)/src/*.h)
 _BJECTS = $(SOURCES:%.c=$(OBJ_PATH)/%.o)
 OBJECTS = $(_BJECTS:%.cpp=$(OBJ_PATH)/%.o)
 
@@ -37,12 +37,12 @@ $(OBJECTS): $(HEADERS)
 
 unix: MCUFLAGS =
 unix: OPTFLAGS = -O0 -g3
-unix: SRCS = $(filter-out %.s,$(filter-out $(ROOT_PATH)/src/malloc.c,$(SOURCES)))
+unix: SRCS = $(filter-out %.s,$(filter-out $(MDK)/src/malloc.c,$(SOURCES)))
 unix: $(SRCS)
 	@mkdir -p $(OBJ_PATH)
 	$(CC) $(CFLAGS) $(SRCS) -o $(OBJ_PATH)/firmware
 
-$(OBJ_PATH)/%.o: %.c $(wildcard $(ROOT_PATH)/include/%.h)
+$(OBJ_PATH)/%.o: %.c $(wildcard $(MDK)/include/%.h)
 	@mkdir -p $(dir $@)
 	$(TOOLCHAIN)-gcc $(CFLAGS) -c $< -o $@
 
@@ -76,8 +76,8 @@ flash: $(OBJ_PATH)/$(PROG).bin $(ESPUTIL)
 monitor: $(ESPUTIL)
 	$(ESPUTIL) -p $(PORT) monitor
 
-$(ESPUTIL): $(ROOT_PATH)/tools/esputil.c
-	make -C $(ROOT_PATH)/tools esputil
+$(ESPUTIL): $(MDK)/tools/esputil.c
+	make -C $(MDK)/tools esputil
 
 clean:
 	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(OBJ_PATH)
