@@ -11,8 +11,11 @@ static inline void wdt_disable(void) {
   REG(C3_RTCCNTL)[43] |= BIT(31);
   REG(C3_RTCCNTL)[45] = 0;
 
-  REG(C3_TIMERGROUP0)[18] &= BIT(31);  // Disable T0 WDT
-  REG(C3_TIMERGROUP1)[18] &= BIT(31);  // Disable T1 WDT
+  REG(C3_RTCCNTL)[35] = 0;      // Disable
+  REG(C3_TIMERGROUP0)[18] = 0;  // Disable T0 WDT
+  REG(C3_TIMERGROUP1)[18] = 0;  // Disable T1 WDT
+  // REG(C3_TIMERGROUP0)[18] &= BIT(31);  // Disable T0 WDT
+  // REG(C3_TIMERGROUP1)[18] &= BIT(31);  // Disable T1 WDT
 }
 #elif defined(ESP32)
 static inline void wdt_feed(void) {

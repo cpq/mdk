@@ -310,8 +310,8 @@ static void flash(struct slip *slip, int fd, bool verbose, const char **args) {
       if (seq == 0) {
         buf[hs + 2] = 0x2, buf[hs + 3] = 0x20;
         // Set chip type in the extended header at offset 4.
-        // Common header is 8, plus 4 bytes entry point, plus offset 4 = 16
-        if (chip_id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 16] = 5;
+        // Common header is 8, plus extended header offset 4 = 12
+        if (chip_id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 12] = 5;
       }
 
       // Flash write
