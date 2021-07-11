@@ -1,6 +1,7 @@
 PROG      ?= firmware
 ROOT_PATH ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 ARCH      ?= ESP32C3
+TOOLCHAIN ?= riscv64-unknown-elf
 OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
 ESPUTIL   ?= $(ROOT_PATH)/tools/esputil
@@ -17,12 +18,10 @@ CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(EXTRA_CF
 LINKFLAGS ?= $(MCUFLAGS) -T$(ROOT_PATH)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
 
 ifeq "$(ARCH)" "ESP32C3"
-TOOLCHAIN ?= riscv64-unknown-elf
 MCUFLAGS  ?= -march=rv32imc -mabi=ilp32
 WARNFLAGS ?= -Wformat-truncation
 BLOFFSET  ?= 0  # 2nd stage bootloader flash offset
 else 
-TOOLCHAIN ?= xtensa-esp32-elf
 MCUFLAGS  ?= -mlongcalls -mtext-section-literals
 BLOFFSET  ?= 0x1000  # 2nd stage bootloader flash offset
 endif

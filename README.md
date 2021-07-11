@@ -16,27 +16,22 @@ for a full firmware rebuild and flash:
 
 # Environment setup
 
-Required tools: 
-- MacOS or Linux operating system
-- For ESP32C3, install a 32-bit riscv GCC crosscompiler:
-   - MacOS (takes time):
-      ```sh
-      $ brew tap riscv/riscv
-      $ brew install riscv-gnu-toolchain --with-multilib
-      ```
-   - Linux:
-      ```sh
-      $ sudo apt-get install -y gcc-riscv64-linux-gnu
-      ```
-- For ESP32, a 32-bit xtensa-esp32-elf-gcc crosscompiler is required,
-  make sure it is in the PATH
-
-Export the following environment variables:
-
-```sh
-$ export ARCH=ESP32C3          # Choices: ESP32C3, ESP32
-$ export PORT=/dev/ttyUSB0     # Serial port for flashing
-```
+Install a GCC RISCV compiler and export environment variables:
+- MacOS (installation takes time):
+  ```sh
+  $ brew tap riscv/riscv
+  $ brew install riscv-gnu-toolchain --with-multilib
+  $ export TOOLCHAIN=riscv64-unknown-elf    # $TOOLCHAIN-gcc must run GCC
+  $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
+  $ export PORT=/dev/cu.usb*                # Serial port for flashing
+  ```
+- Linux:
+  ```sh
+  $ sudo apt-get install -y gcc-riscv64-linux-gnu
+  $ export TOOLCHAIN=riscv64-linux-gnu      # $TOOLCHAIN-gcc must run GCC
+  $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
+  $ export PORT=/dev/ttyUSB0                # Serial port for flashing
+  ```
 
 Verify setup by building and flashing a blinky example firmware.
 From repository root, execute:
@@ -65,7 +60,7 @@ Environment / Makefile variables:
 | Name | Description |
 | ---- | ----------- |
 | ARCH | Architecture. Possible values: ESP32C3, ESP32. Default: ESP32C3 |
-| TOOLCHAIN | GCC binary prefix. Default: for ESP32C3: riscv64-unknown-elf; for ESP32: xtensa-esp32-elf  |
+| TOOLCHAIN | GCC binary prefix. Default: riscv64-unknown-elf |
 | PORT | Serial port. Default: /dev/ttyUSB0 |
 | EXTRA\_CFLAGS | Extra compiler flags. Default: empty |
 | EXTRA\_LINKFLAGS | Extra linker flags. Default: empty |
