@@ -64,6 +64,7 @@ elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep $2 | tr -s 
 # elf_symbol_address FILE,SYMBOL
 elf_entry_point_address = $(shell $(TOOLCHAIN)-nm $1 | grep 'T $2' | cut -f1 -dT)
 
+$(OBJ_PATH)/$(PROG).bin: $(ESPUTIL)
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 	$(TOOLCHAIN)-objcopy -O binary --only-section .text $< $(OBJ_PATH)/.text.bin
 	$(TOOLCHAIN)-objcopy -O binary --only-section .data $< $(OBJ_PATH)/.data.bin

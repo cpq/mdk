@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -43,7 +44,9 @@ static int open_serial(const char *name, int baud, bool verbose) {
   struct termios tio;
   if (fd < 0) fail("open(%s): %d (%s)\n", name, fd, strerror(errno));
   if (fd >= 0 && tcgetattr(fd, &tio) == 0) {
-    tio.c_ispeed = tio.c_ospeed = baud;
+	cfsetospeed(&tio, (speed_t) baud);
+    cfsetispeed(&tio, (speed_t) baud);
+    // tio.c_ispeed = tio.c_ospeed = baud;
     tio.c_cflag = CS8 | CREAD | CLOCAL;
     tio.c_lflag = tio.c_oflag = tio.c_iflag = 0;
     tcsetattr(fd, TCSANOW, &tio);
