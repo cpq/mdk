@@ -27,8 +27,14 @@ Install a GCC RISCV compiler and export environment variables:
   ```
 - Linux:
   ```sh
-  $ sudo apt-get install -y gcc-riscv64-linux-gnu
+  $ sudo apt-get install -y gcc-riscv64-linux-gnu # TBD: how about 32bit??
   $ export TOOLCHAIN=riscv64-linux-gnu      # $TOOLCHAIN-gcc must run GCC
+  $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
+  $ export PORT=/dev/ttyUSB0                # Serial port for flashing
+  ```
+- MacOS or Linux using Docker:
+  ```sh
+  $ export TOOLCHAIN='docker run -it --rm -v `cd ../..;pwd`:`cd ../..;pwd` -w `pwd` mdashnet/riscv riscv-none-elf'
   $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/ttyUSB0                # Serial port for flashing
   ```
