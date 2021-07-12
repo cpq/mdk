@@ -207,7 +207,7 @@ static int read_reg(struct ctx *ctx, uint32_t addr) {
 static bool chip_connect(struct ctx *ctx) {
   reset_to_bootloader(ctx->fd);
   for (int i = 0; i < 50; i++) {
-    uint8_t data[36] = {0x07, 0x07, 0x02, 0x20};
+    uint8_t data[36] = {7, 7, 0x12, 0x20};
     memset(data + 4, 0x55, sizeof(data) - 4);
     if (cmd(ctx, 8, data, sizeof(data), 0, 250) == 0) {
       usleep(50 * 1000);
@@ -311,10 +311,11 @@ static void flash(struct ctx *ctx, const char **args) {
       // Embed flash params into an image
       // TODO(cpq): don't hardcode, detect them
       if (seq == 0) {
-        buf[hs + 2] = 0x2, buf[hs + 3] = 0x20;
+        buf[hs + 2] = 0x2, buf[hs + 3] = 0x1f;
         // Set chip type in the extended header at offset 4.
         // Common header is 8, plus extended header offset 4 = 12
         if (chip_id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 12] = 5;
+        if (chip_id == CHIP_ID_ESP32_C3_ECO_1_2) buf[hs + 12] = 5;
       }
 
       // Flash write

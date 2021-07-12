@@ -21,23 +21,17 @@ Install a GCC RISCV compiler and export environment variables:
   ```sh
   $ brew tap riscv/riscv
   $ brew install riscv-gnu-toolchain --with-multilib
-  $ export MDK=/path/to/mdk                 # Points to MDK path
+  $ export MDK=/path/to/mdk                 # Points to MDK directory
+  $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
   $ export TOOLCHAIN=riscv64-unknown-elf    # $TOOLCHAIN-gcc must run GCC
   $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/cu.usb*                # Serial port for flashing
   ```
-- Linux:
+- Linux: install GCC, e.g. from https://github.com/stnolting/riscv-gcc-prebuilt, then
   ```sh
-  $ sudo apt-get install -y gcc-riscv64-linux-gnu # TBD: how about 32bit??
-  $ export MDK=/path/to/mdk                 # Points to MDK path
-  $ export TOOLCHAIN=riscv64-linux-gnu      # $TOOLCHAIN-gcc must run GCC
-  $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
-  $ export PORT=/dev/ttyUSB0                # Serial port for flashing
-  ```
-- MacOS or Linux using Docker:
-  ```sh
-  $ export MDK=/path/to/mdk                 # Points to MDK path
-  $ export TOOLCHAIN="docker run -v $MDK:$MDK -e MDK:$MDK -w \`pwd\` mdashnet/riscv riscv-none-elf"
+  $ export MDK=/path/to/mdk                 # Points to MDK directory
+  $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
+  $ export TOOLCHAIN=riscv32-unknown-elf    # $TOOLCHAIN-gcc must run GCC
   $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/ttyUSB0                # Serial port for flashing
   ```
