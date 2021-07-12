@@ -27,11 +27,11 @@ Install a GCC RISCV compiler and export environment variables:
   $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/cu.usb*                # Serial port for flashing
   ```
-- Linux: install GCC, e.g. from https://github.com/stnolting/riscv-gcc-prebuilt, then
+- Linux: install GCC, e.g. from https://github.com/espressif/crosstool-NG, then
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
   $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
-  $ export TOOLCHAIN=riscv32-unknown-elf    # $TOOLCHAIN-gcc must run GCC
+  $ export TOOLCHAIN=riscv32-esp-elf        # $TOOLCHAIN-gcc must run GCC
   $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/ttyUSB0                # Serial port for flashing
   ```
