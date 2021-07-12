@@ -191,15 +191,14 @@ Using that SLIP protocol, it is possible to write images to flash at
 any offset. That is what [tools/esputil.c](tools/esputil.c) implements.
 The image should be of the following format:
 
-- COMMON HEADER - contains number of segments in the image and flash params
-- ENTRY POINT ADDRESS - the beginning of the image code
-- EXTENDED HEADER - contains chip ID and extra flash params
+- COMMON HEADER - 4 bytes, contains number of segments in the image and flash params
+- ENTRY POINT ADDRESS - 4 bytes, the beginning of the image code
+- EXTENDED HEADER - 16 bytes, contains chip ID and extra flash params
 - One or more SEGMENTS, which are padded to 16 bytes
 
 ```
- | COMMON HEADER | ENTRY |           EXTENDED HEADER          | SEGM1 | ... | 
- | 0xe9 N F1 F2  |       | 0xee 0 0 0 C 0 V 0 0 0 0 0 0 0 0 1 |       | ... | 
-     4 bytes      4 bytes               16 bytes
+ | COMMON HEADER |  ENTRY  |           EXTENDED HEADER          | SEGM1 | ... | 
+ | 0xe9 N F1 F2  | X X X X | 0xee 0 0 0 C 0 V 0 0 0 0 0 0 0 0 1 |       | ... | 
 
    0xe9 - Espressif image magic number. All images must start with 0xe9
    N    - a number of segments in the image
