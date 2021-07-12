@@ -4,6 +4,7 @@ ARCH      ?= ESP32C3
 TOOLCHAIN ?= riscv64-unknown-elf
 OBJ_PATH  = ./build
 PORT      ?= /dev/ttyUSB0
+FPARAMS   ?= 0x220
 ESPUTIL   ?= $(MDK)/tools/esputil
 
 # -g3 pulls enums and defines into the debug info for GDB
@@ -71,7 +72,7 @@ $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 	$(ESPUTIL) mkbin $@ $(call elf_entry_point_address,$<,_reset) $(call elf_section_load_address,$<,.data) $(OBJ_PATH)/.data.bin $(call elf_section_load_address,$<,.text) $(OBJ_PATH)/.text.bin
 
 flash: $(OBJ_PATH)/$(PROG).bin $(ESPUTIL)
-	$(ESPUTIL) -p $(PORT) flash $(BLOFFSET) $(OBJ_PATH)/$(PROG).bin
+	$(ESPUTIL) -p $(PORT) -fp $(FPARAMS) flash $(BLOFFSET) $(OBJ_PATH)/$(PROG).bin
 
 monitor: $(ESPUTIL)
 	$(ESPUTIL) -p $(PORT) monitor
