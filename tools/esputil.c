@@ -29,6 +29,7 @@ struct ctx {
   struct slip slip;  // SLIP state machine
   const char *baud;  // Baud rate
   const char *port;  // Serial port
+  const char *fpar;  // Flash params, e.g. "0x220"
   bool verbose;      // Hexdump serial comms
   int fd;            // Serial port file descriptor
 };
@@ -90,7 +91,9 @@ static void usage(void) {
   printf("Usage:\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
-  printf("  esputil [-v] [-b BAUD] [-p PORT] flash OFFSET BINFILE ...\n");
+  printf(
+      "  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASHPARAMS] "
+      "flash OFFSET BINFILE ...\n");
   printf("  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...\n");
   exit(EXIT_FAILURE);
 }
@@ -311,7 +314,10 @@ static void flash(struct ctx *ctx, const char **args) {
       // Embed flash params into an image
       // TODO(cpq): don't hardcode, detect them
       if (seq == 0) {
-        buf[hs + 2] = 0x2, buf[hs + 3] = 0x1f;
+        uint16_t flash_params = (uint16_t) strtoul(ctx->fpar, NULL, 0);
+        buf[hs + 2] = (uint8_t)((flash_params >> 8) & 255);
+        buf[hs + 3] = (uint8_t)(flash_params & 255);
+
         // Set chip type in the extended header at offset 4.
         // Common header is 8, plus extended header offset 4 = 12
         if (chip_id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 12] = 5;
@@ -398,6 +404,7 @@ int main(int argc, const char **argv) {
   struct ctx ctx = {
       .port = getenv("PORT"),  // Serial port
       .baud = getenv("BAUD"),  // Serial port baud rate
+      .fpar = "0x220",         // Flash params
       .slip = {.buf = slipbuf, .size = sizeof(slipbuf)},  // SLIP context
   };
   if (ctx.port == NULL) ctx.port = "/dev/ttyUSB0";
@@ -407,6 +414,8 @@ int main(int argc, const char **argv) {
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
       ctx.baud = argv[++i];
+    } else if (strcmp(argv[i], "-fp") == 0 && i + 1 < argc) {
+      ctx.fpar = argv[++i];
     } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
       ctx.port = argv[++i];
     } else if (strcmp(argv[i], "-v") == 0) {
