@@ -96,7 +96,7 @@ API support matrix:
 | ESP32C3 | yes  | yes |  -  |  yes |  -   |  yes  |  yes   | -    |
 | ESP32   | yes  | yes |  -  |  -   |  -   |  yes  |  yes   | -    |
 
-- GPIO [[src/gpio.h](src/gpio.h)]
+- GPIO [src/gpio.h](src/gpio.h)
   ```c
   void gpio_output(int pin);              // Set pin mode to OUTPUT
   void gpio_input(int pin);               // Set pin mode to INPUT
@@ -104,7 +104,7 @@ API support matrix:
   void gpio_toggle(int pin);              // Toggle pin value
   bool gpio_read(int pin);                // Read pin value
   ```
-- SPI [[src/spi.h](src/spi.h)], [[src/spi.c](src/spi.c)]
+- SPI [src/spi.h](src/spi.h), [src/spi.c](src/spi.c)
   ```c
   // SPI descriptor. Specifies pins for MISO, MOSI, CLK and chip select
   struct spi { int miso, mosi, clk, cs[3]; };
@@ -114,18 +114,18 @@ API support matrix:
   void spi_end(struct spi *spi, int cs);    // End SPI transaction
   unsigned char spi_txn(struct spi *spi, unsigned char);   // Do SPI transaction
   ```
-- UART [[src/uart.h](src/uart.h)], [[src/uart.c](src/uart.c)]
+- UART [src/uart.h](src/uart.h), [src/uart.c](src/uart.c)
   ```c
   void uart_init(int no, int tx, int rx, int baud);   // Initialise UART
   bool uart_read(int no, uint8_t *c);   // Read byte. Return true on success
   void uart_write(int no, uint8_t c);   // Write byte. Block if FIFO is full
   ```
 - LEDC
-- WDT [[src/wdt.h](src/wdt.h)]
+- WDT [src/wdt.h](src/wdt.h)
   ```c
   void wdt_disable(void);   // Disable watchdog
   ```
-- Timer [[src/timer.h](src/timer.h)]
+- Timer [src/timer.h](src/timer.h)
   ```c
   struct timer {
     uint64_t period;       // Timer period in micros
@@ -138,7 +138,7 @@ API support matrix:
   #define TIMER_ADD(head_, p_, fn_, arg_)
   void timers_poll(struct timer *head, uint64_t now);
   ```
-- System  [[src/sys.h](src/sys.h)]
+- System  [src/sys.h](src/sys.h)
   ```c
   int sdk_ram_used(void);           // Return used RAM in bytes
   int sdk_ram_free(void);           // Return free RAM in bytes
@@ -147,7 +147,7 @@ API support matrix:
   void delay_ms(unsigned long ms);  // Block for "ms" milliseconds
   void spin(unsigned long count);   // Execute "count" no-op instructions
   ```
-- Log [[src/log.h](src/log.h)], [[src/log.c](src/log.c)]
+- Log [src/log.h](src/log.h), [src/log.c](src/log.c)
   ```c
   void sdk_log(const char *fmt, ...);   // Log message to UART 0
                                         // Supported specifiers:
@@ -178,4 +178,47 @@ implementation looks like:
 #elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
 ...  <-- Here goes a mocked-out hardware API implementation
 #endif
+```
+
+# ESP32 flashing
+
+Flashing ESP32 chips is done via UART. In order to do so, ESP32 should be
+rebooted in the flashing mode, by pulling IO0 low during boot. Then, a ROM
+bootloader uses SLIP framing for a simple serial protocol, which is
+described at https://github.com/espressif/esptool/wiki/Serial-Protocol.
+
+Using that SLIP protocol, it is possible to write images to flash at
+any offset. That is what [tools/esputil.c](tools/esputil.c) implements.
+The image should be of the following format:
+
+- COMMON HEADER - contains number of segments in the image and flash params
+- ENTRY POINT ADDRESS - the beginning of the image code
+- EXTENDED HEADER - contains chip ID and extra flash params
+- One or more SEGMENTS, which are padded to 16 bytes
+
+```
+ | COMMON HEADER | ENTRY |           EXTENDED HEADER          | SEGM1 | ... | 
+ | 0xe9 N F1 F2  |       | 0xee 0 0 0 C 0 V 0 0 0 0 0 0 0 0 1 |      | ... | 
+     4 bytes      4 bytes               16 bytes
+
+   0xe9 - Espressif image magic number. All images must start with 0xe9
+   N    - a number of segments in the image
+   FP1  - flash mode. 0: QIO, 1: QOUT, 2: DIO, 3: DOUT
+   FP2  - flash size (high 4 bits) and flash frequency (low 4 bits):
+            size: 0: 1MB, 0x10: 2MB, 0x20: 4MB, 0x30: 8MB, 0x40: 16MB
+            freq: 0: 40m, 1: 26m, 2: 20m, 0xf: 80m
+
+   ENTRY - 4-byte entry point address in little endian
+   C     - Chip ID. 0: ESP32, 5: ESP32C3
+   V     - Chip revision
+```
+
+By default, `esputil` uses flash params `0x220`, which means 4MB chip,
+40 MHz frequency, DIO mode. In order to set a different value, use
+`-fp 0x..`  argument, or `FPARAMS=0x...` make variable.
+These two commands are equivalent:
+
+```
+$ make flash FPARAMS=0x21f
+$ esputil -fp 0x21f flash build/firmware.bin
 ```
