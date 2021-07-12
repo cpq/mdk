@@ -198,7 +198,7 @@ The image should be of the following format:
 
 ```
  | COMMON HEADER | ENTRY |           EXTENDED HEADER          | SEGM1 | ... | 
- | 0xe9 N F1 F2  |       | 0xee 0 0 0 C 0 V 0 0 0 0 0 0 0 0 1 |      | ... | 
+ | 0xe9 N F1 F2  |       | 0xee 0 0 0 C 0 V 0 0 0 0 0 0 0 0 1 |       | ... | 
      4 bytes      4 bytes               16 bytes
 
    0xe9 - Espressif image magic number. All images must start with 0xe9
