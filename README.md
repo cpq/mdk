@@ -65,7 +65,7 @@ Environment / Makefile variables:
 | ARCH | Architecture. Possible values: ESP32C3, ESP32. Default: ESP32C3 |
 | TOOLCHAIN | GCC binary prefix. Default: riscv64-unknown-elf |
 | PORT | Serial port. Default: /dev/ttyUSB0 |
-| FPARAMS | Flash parameters, see below. Default: 0x220 |
+| FPARAMS | Flash parameters, see below. Default: 0x21f |
 | EXTRA\_CFLAGS | Extra compiler flags. Default: empty |
 | EXTRA\_LINKFLAGS | Extra linker flags. Default: empty |
 
@@ -213,8 +213,8 @@ The image should be of the following format:
    V     - Chip revision
 ```
 
-By default, `esputil` uses flash params `0x220`, which means 4MB chip,
-40 MHz frequency, DIO mode. In order to set a different value, use
+By default, `esputil` uses flash params `0x21f`, which means 4MB chip,
+80 MHz frequency. In order to set a different value, use
 `-fp 0x..`  argument, or `FPARAMS=0x...` make variable.
 These two commands are equivalent:
 

@@ -402,13 +402,14 @@ int main(int argc, const char **argv) {
   const char **command = NULL;  // Command to perform
   uint8_t slipbuf[32 * 1024];   // Buffer for SLIP context
   struct ctx ctx = {
-      .port = getenv("PORT"),  // Serial port
-      .baud = getenv("BAUD"),  // Serial port baud rate
-      .fpar = "0x220",         // Flash params
+      .port = getenv("PORT"),     // Serial port
+      .baud = getenv("BAUD"),     // Serial port baud rate
+      .fpar = getenv("FPARAMS"),  // Flash params
       .slip = {.buf = slipbuf, .size = sizeof(slipbuf)},  // SLIP context
   };
   if (ctx.port == NULL) ctx.port = "/dev/ttyUSB0";
   if (ctx.baud == NULL) ctx.baud = "115200";
+  if (ctx.fpar == NULL) ctx.fpar = "0x21f";
 
   // Parse options
   for (int i = 1; i < argc; i++) {
