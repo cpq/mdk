@@ -1,14 +1,14 @@
-PROG		?= firmware
-MDK			?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
-ARCH		?= ESP32C3
-TOOLCHAIN	?= riscv64-unknown-elf
-OBJ_PATH	= ./build
-ESPUTIL		?= $(MDK)/tools/esputil
-ESPTOOL		?= python -m esptool
-PORT		?= /dev/ttyUSB0
-flash_mode	= 021f
-chip_id		= 05
-chip_rev	= 02
+PROG        ?= firmware
+MDK         ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+ARCH        ?= ESP32C3
+TOOLCHAIN   ?= riscv64-unknown-elf
+OBJ_PATH    = ./build
+ESPUTIL     ?= $(MDK)/tools/esputil
+ESPTOOL     ?= python -m esptool
+PORT        ?= /dev/ttyUSB0
+flash_mode  = 021f
+chip_id     = 05
+chip_rev    = 02
 
 # -g3 pulls enums and defines into the debug info for GDB
 # -ffunction-sections -fdata-sections, -Wl,--gc-sections remove unused code
@@ -32,8 +32,8 @@ endif
 
 define edit_bin
 sed "1s/^\(.\{4\}\).\{4\}/\1$(flash_mode)/; \
-	 1s/^\(.\{24\}\).\{2\}/\1$(chip_id)/; \
-	 1s/^\(.\{28\}\).\{2\}/\1$(chip_rev)/" -
+     1s/^\(.\{24\}\).\{2\}/\1$(chip_id)/; \
+     1s/^\(.\{28\}\).\{2\}/\1$(chip_rev)/" -
 endef
 
 SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
