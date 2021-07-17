@@ -1,9 +1,14 @@
-PROG      ?= firmware
-MDK       ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
-ARCH      ?= ESP32C3
-TOOLCHAIN ?= riscv64-unknown-elf
-OBJ_PATH  = ./build
-ESPUTIL   ?= $(MDK)/tools/esputil
+PROG		?= firmware
+MDK			?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+ARCH		?= ESP32C3
+TOOLCHAIN	?= riscv64-unknown-elf
+OBJ_PATH	= ./build
+ESPUTIL		?= $(MDK)/tools/esputil
+ESPTOOL		?= python -m esptool
+PORT		?= /dev/ttyUSB0
+flash_mode	= 021f
+chip_id		= 05
+chip_rev	= 02
 
 # -g3 pulls enums and defines into the debug info for GDB
 # -ffunction-sections -fdata-sections, -Wl,--gc-sections remove unused code
@@ -24,6 +29,12 @@ else
 MCUFLAGS  ?= -mlongcalls -mtext-section-literals
 BLOFFSET  ?= 0x1000  # 2nd stage bootloader flash offset
 endif
+
+define edit_bin
+sed "1s/^\(.\{4\}\).\{4\}/\1$(flash_mode)/; \
+	 1s/^\(.\{24\}\).\{2\}/\1$(chip_id)/; \
+	 1s/^\(.\{28\}\).\{2\}/\1$(chip_rev)/" -
+endef
 
 SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(MDK)/src/*.c)
@@ -69,8 +80,14 @@ $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
 	$(TOOLCHAIN)-objcopy -O binary --only-section .data $< $(OBJ_PATH)/.data.bin
 	$(ESPUTIL) mkbin $@ $(call elf_entry_point_address,$<,_reset) $(call elf_section_load_address,$<,.data) $(OBJ_PATH)/.data.bin $(call elf_section_load_address,$<,.text) $(OBJ_PATH)/.text.bin
 
+$(OBJ_PATH)/$(PROG)_edit.bin: $(OBJ_PATH)/$(PROG).bin
+	xxd -p $< | $(edit_bin) | xxd -p -r - > $@
+
 flash: $(OBJ_PATH)/$(PROG).bin $(ESPUTIL)
 	$(ESPUTIL) flash $(BLOFFSET) $(OBJ_PATH)/$(PROG).bin
+
+esptool: $(OBJ_PATH)/$(PROG)_edit.bin
+	$(ESPTOOL) -p $(PORT) write_flash $(BLOFFSET) $< 
 
 monitor: $(ESPUTIL)
 	$(ESPUTIL) monitor
