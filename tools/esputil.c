@@ -133,7 +133,7 @@ static void reset_to_bootloader(int fd) {
 
 static int open_serial(const char *name, int baud, bool verbose) {
   struct termios tio;
-  int fd = open(name, O_RDWR | O_NOCTTY);
+  int fd = open(name, O_RDWR | O_NOCTTY | O_SYNC);
   if (fd < 0) {
     fail("open(%s): %d (%s)\n", name, fd, strerror(errno));
   } else if (tcgetattr(fd, &tio) == 0) {
