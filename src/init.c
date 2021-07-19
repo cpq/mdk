@@ -67,7 +67,6 @@ void start(void) {
 #endif
   for (char *p = &_sbss; p < &_ebss;) *p++ = '\0';
   heap_init(&_end, &_eram);
-  sdk_log("BSS INIT: %p - %p, %p\n", &_sbss, &_ebss, s_brk);
   clock_init();
   main();
 }
