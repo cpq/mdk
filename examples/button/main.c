@@ -9,9 +9,9 @@ int main(void) {
   for (;;) {
     bool current = gpio_read(BTN1);
     if (current != previous) {
-      previous = current;
       gpio_write(LED1, !previous);
       sdk_log("BTN: %d -> %d\n", previous, current);
+      previous = current;
     }
     delay_ms(10);
   }
