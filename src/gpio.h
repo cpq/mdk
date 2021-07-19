@@ -33,7 +33,7 @@ static inline void gpio_input(int pin) {
 }
 
 static inline bool gpio_read(int pin) {
-  return REG(C3_IO_MUX)[15] & BIT(pin) ? 1 : 0;
+  return REG(C3_GPIO)[15] & BIT(pin) ? 1 : 0;
 }
 
 #elif defined(ESP32)
