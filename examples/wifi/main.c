@@ -3,8 +3,10 @@
 static void cb(void) {
   uint8_t mac[6] = {};
   wifi_get_mac_addr(mac);
-  sdk_log("WiFi mac: %x:%x:%x:%x:%x:%x\n", mac[0], mac[1], mac[2], mac[3],
-          mac[4], mac[5]);
+
+  unsigned cpu_freq = ((unsigned (*)(void)) 0x40000584)();  // esp32c3.rom.ld
+  sdk_log("WiFi mac: %x:%x:%x:%x:%x:%x, cpu_freq: %d\n", mac[0], mac[1], mac[2],
+          mac[3], mac[4], mac[5], cpu_freq);
 }
 
 int main(void) {
@@ -22,6 +24,7 @@ int main(void) {
   for (;;) {
     cb();
     delay_ms(1500);
+    //((void (*)(void *)) 0x40001720)(cb);  // ppTask()
   }
 
   return 0;
