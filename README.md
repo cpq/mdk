@@ -17,7 +17,11 @@ for a full firmware rebuild and flash:
 # Environment setup
 
 Install a GCC RISCV compiler and export environment variables:
-- MacOS (installation takes time):
+- Docker (slower compilation but works off-the-shelf):
+  $ export MDK=/path/to/mdk                 # Points to MDK directory
+  $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
+  $ export PORT=/dev/cu.usb*                # Serial port for flashing
+- Native MacOS (installation takes time):
   ```sh
   $ brew tap riscv/riscv
   $ brew install riscv-gnu-toolchain --with-multilib
@@ -27,7 +31,7 @@ Install a GCC RISCV compiler and export environment variables:
   $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/cu.usb*                # Serial port for flashing
   ```
-- Linux: install GCC, e.g. from https://github.com/espressif/crosstool-NG, then
+- Native Linux: install GCC, e.g. from https://github.com/espressif/crosstool-NG, then
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
   $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
