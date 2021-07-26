@@ -18,9 +18,11 @@ for a full firmware rebuild and flash:
 
 Install a GCC RISCV compiler and export environment variables:
 - Docker (slower compilation but works off-the-shelf):
+  ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
   $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
   $ export PORT=/dev/cu.usb*                # Serial port for flashing
+  ```
 - Native MacOS (installation takes time):
   ```sh
   $ brew tap riscv/riscv
