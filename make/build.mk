@@ -1,8 +1,9 @@
 PROG      ?= firmware
 MDK       ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 ARCH      ?= ESP32C3
-TOOLCHAIN ?= riscv64-unknown-elf
-OBJ_PATH  = ./build
+#TOOLCHAIN ?= riscv64-unknown-elf
+TOOLCHAIN ?= docker run -it --rm -v $(MDK):$(MDK) -w $(CURDIR) mdashnet/riscv riscv-none-elf
+OBJ_PATH  ?= ./build
 ESPUTIL   ?= $(MDK)/tools/esputil
 
 # -g3 pulls enums and defines into the debug info for GDB
@@ -28,11 +29,15 @@ endif
 SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(MDK)/src/*.c)
 HEADERS += $(wildcard $(MDK)/src/*.h)
-_BJECTS = $(SOURCES:%.c=$(OBJ_PATH)/%.o)
-OBJECTS = $(_BJECTS:%.cpp=$(OBJ_PATH)/%.o)
+O1       = $(SOURCES:%.c=$(OBJ_PATH)/%.o)
+O2       = $(O1:%.cpp=$(OBJ_PATH)/%.o)
+OBJECTS  = $(O2:%.s=$(OBJ_PATH)/%.o)
 
 build: $(OBJ_PATH)/$(PROG).bin
 $(OBJECTS): $(HEADERS)
+
+$(ESPUTIL): $(MDK)/tools/esputil.c
+	make -C $(MDK)/tools esputil
 
 unix: MCUFLAGS =
 unix: OPTFLAGS = -O0 -g3
@@ -41,7 +46,7 @@ unix: $(SRCS)
 	@mkdir -p $(OBJ_PATH)
 	$(CC) $(CFLAGS) $(SRCS) -o $(OBJ_PATH)/firmware
 
-$(OBJ_PATH)/%.o: %.c $(wildcard $(MDK)/include/%.h)
+$(OBJ_PATH)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(TOOLCHAIN)-gcc $(CFLAGS) -c $< -o $@
 
@@ -75,8 +80,23 @@ flash: $(OBJ_PATH)/$(PROG).bin $(ESPUTIL)
 monitor: $(ESPUTIL)
 	$(ESPUTIL) monitor
 
-$(ESPUTIL): $(MDK)/tools/esputil.c
-	make -C $(MDK)/tools esputil
-
 clean:
 	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(OBJ_PATH)
+
+# esptool fallback, in case esputil does not work
+ESPTOOL   ?= python -m esptool
+FLASH_MODE ?= 021f
+CHIP_ID ?= 05
+CHIP_REV ?= 02
+PORT ?= /dev/ttyUSB0
+define edit_bin
+sed "1s/^\(.\{4\}\).\{4\}/\1$(FLASH_MODE)/; \
+     1s/^\(.\{24\}\).\{2\}/\1$(CHIP_ID)/; \
+     1s/^\(.\{28\}\).\{2\}/\1$(CIDHIP_REV)/" -
+endef
+
+$(OBJ_PATH)/$(PROG)_edit.bin: $(OBJ_PATH)/$(PROG).bin
+	xxd -p $< | $(edit_bin) | xxd -p -r - > $@
+
+esptool: $(OBJ_PATH)/$(PROG)_edit.bin
+	$(ESPTOOL) -p $(PORT) write_flash $(BLOFFSET) $< 
