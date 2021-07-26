@@ -17,7 +17,7 @@ for a full firmware rebuild and flash:
 # Environment setup
 
 Install a GCC RISCV compiler and export environment variables:
-- Docker (slower compilation but works off-the-shelf):
+- Using Docker on Linux or Mac. Slower builds, but works off-the-shelf:
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
   $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
