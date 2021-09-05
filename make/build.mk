@@ -63,7 +63,7 @@ $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
 	$(TOOLCHAIN)-size $@
 
 # elf_section_load_address FILE,SECTION_NAME
-elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep $2 | tr -s ' ' | cut -d ' ' -f 5)
+elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep -F $2 | tr -s ' ' | cut -d ' ' -f 5)
 
 # elf_symbol_address FILE,SYMBOL
 elf_entry_point_address = $(shell $(TOOLCHAIN)-nm $1 | grep 'T $2' | cut -f1 -dT)
