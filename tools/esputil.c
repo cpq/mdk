@@ -87,13 +87,14 @@ static void uart_tx(unsigned char byte, void *arg) {
   (void) len;  // Shut up GCC
 }
 
-static void usage(void) {
+static void usage(struct ctx *ctx) {
+  printf("Defaults: BAUD=%s, PORT=%s, FLASHPARAMS=%s\n", ctx->baud, ctx->port,
+         ctx->fpar);
   printf("Usage:\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
-  printf(
-      "  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASHPARAMS] "
-      "flash OFFSET BINFILE ...\n");
+  printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASHPARAMS] ");
+  printf("flash OFFSET BINFILE ...\n");
   printf("  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...\n");
   exit(EXIT_FAILURE);
 }
@@ -131,17 +132,46 @@ static void reset_to_bootloader(int fd) {
   flushio(fd);         // Discard all data
 }
 
+// clang-format off
+static speed_t termios_baud(int baud) {
+    switch (baud) {
+    case 9600:    return B9600;
+    case 19200:   return B19200;
+    case 38400:   return B38400;
+    case 57600:   return B57600;
+    case 115200:  return B115200;
+    case 230400:  return B230400;
+    case 460800:  return B460800;
+    case 500000:  return B500000;
+    case 576000:  return B576000;
+    case 921600:  return B921600;
+    case 1000000: return B1000000;
+    case 1152000: return B1152000;
+    case 1500000: return B1500000;
+    case 2000000: return B2000000;
+    case 2500000: return B2500000;
+    case 3000000: return B3000000;
+    case 3500000: return B3500000;
+    case 4000000: return B4000000;
+    default:      return B0;
+    }
+}
+// clang-format on
+
 static int open_serial(const char *name, int baud, bool verbose) {
   struct termios tio;
   int fd = open(name, O_RDWR | O_NOCTTY | O_SYNC);
   if (fd < 0) {
     fail("open(%s): %d (%s)\n", name, fd, strerror(errno));
   } else if (tcgetattr(fd, &tio) == 0) {
-    cfsetospeed(&tio, (speed_t) baud);
-    cfsetispeed(&tio, (speed_t) baud);
-    tio.c_lflag = tio.c_oflag = tio.c_iflag = 0;
-    tio.c_cflag &= ~(CSIZE | PARENB | CSTOPB | CRTSCTS);
-    tio.c_cflag |= CLOCAL | CREAD | CS8;
+    tio.c_iflag = 0;             // input mode
+    tio.c_oflag = 0;             // output mode
+    tio.c_lflag = 0;             // local flags
+    tio.c_cflag = CLOCAL | CS8;  // control flags
+    // Order is important: setting speed must go after setting flags,
+    // becase (depending on implementation) speed flags could reside in flags
+    cfsetospeed(&tio, termios_baud(baud));
+    cfsetispeed(&tio, termios_baud(baud));
     tcsetattr(fd, TCSANOW, &tio);
   }
   if (verbose) printf("Opened %s @ %d fd=%d\n", name, baud, fd);
@@ -184,7 +214,7 @@ static int cmd(struct ctx *ctx, uint8_t op, void *buf, uint16_t len,
   fd_set rset = iowait(ctx->fd, timeout_ms);  // Wait until device is ready
   if (!FD_ISSET(ctx->fd, &rset)) return 1;    // Interrupted, fail
   int n = read(ctx->fd, tmp, sizeof(tmp));    // Read from a device
-  if (n <= 0) fail("Serial line closed\n");  // Doh. Unplugged maybe?
+  if (n <= 0) fail("Serial line closed\n");   // Doh. Unplugged maybe?
   // if (verbose) dump("R", tmp, n);
   for (int i = 0; i < n; i++) {
     size_t r = slip_recv(tmp[i], &ctx->slip);  // Pass to SLIP state machine
@@ -236,6 +266,7 @@ static void monitor(struct ctx *ctx) {
       if (len <= 0) continue;
       if (ctx->verbose) dump("SR", ctx->slip.buf, len);
     }
+    fflush(stdout);
   }
   if (FD_ISSET(0, &rset)) {  // Forward stdin to a device
     uint8_t buf[BUFSIZ];
@@ -315,8 +346,8 @@ static void flash(struct ctx *ctx, const char **args) {
       // TODO(cpq): don't hardcode, detect them
       if (seq == 0) {
         uint16_t flash_params = (uint16_t) strtoul(ctx->fpar, NULL, 0);
-        buf[hs + 2] = (uint8_t)((flash_params >> 8) & 255);
-        buf[hs + 3] = (uint8_t)(flash_params & 255);
+        buf[hs + 2] = (uint8_t) ((flash_params >> 8) & 255);
+        buf[hs + 3] = (uint8_t) (flash_params & 255);
 
         // Set chip type in the extended header at offset 4.
         // Common header is 8, plus extended header offset 4 = 12
@@ -371,7 +402,8 @@ static void mkbin(const char *bin_path, const char *ep, const char *args[]) {
   for (uint8_t i = 0; i < num_segments; i++) {
     uint32_t load_address = strtoul(args[i * 2], NULL, 16);
     FILE *fp = fopen(args[i * 2 + 1], "rb");
-    if (fp == NULL) fail("Cannot open %s: %d\n", args[i * 2 + 1], errno);
+    if (fp == NULL)
+      fail("Cannot open %s: %s\n", args[i * 2 + 1], strerror(errno));
     fseek(fp, 0, SEEK_END);
     uint32_t size = ftell(fp);
     rewind(fp);
@@ -422,21 +454,22 @@ int main(int argc, const char **argv) {
     } else if (strcmp(argv[i], "-v") == 0) {
       ctx.verbose = true;
     } else if (argv[i][0] == '-') {
-      usage();
+      usage(&ctx);
     } else {
       command = &argv[i];
       break;
     }
   }
-  if (!command || !*command) usage();
+  if (!command || !*command) usage(&ctx);
 
   // Commands that do not require serial port
   if (strcmp(*command, "mkbin") == 0) {
-    if (!command[1] || !command[2] || !command[3] || !command[4]) usage();
+    if (!command[1] || !command[2] || !command[3] || !command[4]) usage(&ctx);
     mkbin(command[1], command[2], &command[3]);
     return 0;
   }
 
+  // Commands that require serial port. First, open serial.
   ctx.fd = open_serial(ctx.port, atoi(ctx.baud), ctx.verbose);
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
@@ -449,7 +482,7 @@ int main(int argc, const char **argv) {
     while (s_signo == 0) monitor(&ctx);
   } else {
     printf("Unknown command: %s\n", *command);
-    usage();
+    usage(&ctx);
   }
   close(ctx.fd);
   return 0;

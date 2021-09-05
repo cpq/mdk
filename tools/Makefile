@@ -1,13 +1,14 @@
 CFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -Os
+BINDIR ?= .
 
 all:
 	@echo available targets: slipterm esputil test examples
 
 esputil: esputil.c
-	$(CC) $(CFLAGS) $? -o $@
+	$(CC) $(CFLAGS) $? -o $(BINDIR)/$@
 
 slipterm: slipterm.c
-	$(CC) $(CFLAGS) $? -lpcap -lutil -o $@
+	$(CC) $(CFLAGS) $? -lpcap -lutil -o $(BINDIR)/$@
 
 test: unit_test.c
 	$(CC) -I../include -W -Wall -g3 $? -o /tmp/t && /tmp/t
