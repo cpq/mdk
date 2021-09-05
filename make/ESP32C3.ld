@@ -23,6 +23,10 @@ SECTIONS {
     _sdata = .;
     *(.data)
     *(.data*)
+    *(.sdata)
+    *(.sdata*)
+    *(.srodata)
+    *(.srodata*)
     *(.rodata)
     *(.rodata*)
     *(.gnu.linkonce.r.*)
