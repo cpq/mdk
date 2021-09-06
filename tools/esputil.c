@@ -24,6 +24,9 @@
 #define CHIP_ID_ESP32_C3_ECO_1_2 0x6921506f
 #define CHIP_ID_ESP32_C3_ECO3 0x1b31506f
 #define CHIP_ID_ESP8266 0xfff0c101
+#define CHIP_ID_ESP32_S3_BETA2 0xeb004136
+#define CHIP_ID_ESP32_S3_BETA3 0x9
+#define CHIP_ID_ESP32_C6_BETA 0x0da1806f
 
 struct ctx {
   struct slip slip;  // SLIP state machine
@@ -281,6 +284,9 @@ static const char *chip_id_to_str(uint32_t id) {
   if (id == CHIP_ID_ESP32_C3_ECO_1_2) return "ESP32-C3-ECO1+2";
   if (id == CHIP_ID_ESP32_C3_ECO3) return "ESP32-C3-ECO3";
   if (id == CHIP_ID_ESP8266) return "ESP8266";
+  if (id == CHIP_ID_ESP32_C6_BETA) return "ESP32-C6-BETA";
+  if (id == CHIP_ID_ESP32_S3_BETA2) return "ESP32-S3-BETA2";
+  if (id == CHIP_ID_ESP32_S3_BETA3) return "ESP32-S3-BETA3";
   return "Unknown";
 }
 
@@ -332,7 +338,10 @@ static void flash(struct ctx *ctx, const char **args) {
     uint32_t num_blocks = (size + block_size - 1) / block_size;
     uint32_t d1[] = {size, num_blocks, block_size, flash_offset, encrypted};
     uint16_t d1size = sizeof(d1) - 4;
-    if (chip_id == CHIP_ID_ESP32_S2 || chip_id == CHIP_ID_ESP32_C3_ECO3)
+
+    if (chip_id == CHIP_ID_ESP32_S2 || chip_id == CHIP_ID_ESP32_S3_BETA2 ||
+        chip_id == CHIP_ID_ESP32_S3_BETA3 || chip_id == CHIP_ID_ESP32_C6_BETA ||
+        chip_id == CHIP_ID_ESP32_C3_ECO_1_2 || chip_id == CHIP_ID_ESP32_C3_ECO3)
       d1size += 4;
     if (cmd(ctx, 2, d1, d1size, 0, 500)) fail("flash_begin failed\n");
 
