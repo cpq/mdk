@@ -99,7 +99,7 @@ static void usage(struct ctx *ctx) {
   printf("  esputil [-v] [-b BAUD] [-p PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
-  printf("flash OFFSET BINFILE ...\n");
+  printf("[-fs FLASH_SIZE] flash OFFSET BINFILE ...\n");
   printf("  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...\n");
   exit(EXIT_FAILURE);
 }
@@ -484,6 +484,8 @@ int main(int argc, const char **argv) {
       ctx.baud = argv[++i];
     } else if (strcmp(argv[i], "-fp") == 0 && i + 1 < argc) {
       ctx.fpar = argv[++i];
+    } else if (strcmp(argv[i], "-fs") == 0 && i + 1 < argc) {
+      ctx.fsiz = argv[++i];
     } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
       ctx.port = argv[++i];
     } else if (strcmp(argv[i], "-v") == 0) {
