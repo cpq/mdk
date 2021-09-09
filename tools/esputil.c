@@ -19,6 +19,8 @@
 
 #include "slip.h"  // SLIP state machine logic
 
+struct chip {
+  uint32_t id;  // Chip ID, stored in the ROM address 0x40001000
 #define CHIP_ID_ESP32 0x00f01d83
 #define CHIP_ID_ESP32_S2 0x000007c6
 #define CHIP_ID_ESP32_C3_ECO_1_2 0x6921506f
@@ -27,16 +29,30 @@
 #define CHIP_ID_ESP32_S3_BETA2 0xeb004136
 #define CHIP_ID_ESP32_S3_BETA3 0x9
 #define CHIP_ID_ESP32_C6_BETA 0x0da1806f
+  const char *name;  // Chpi name, e.g. "ESP32-S2"
+  uint32_t bla;      // Bootloader flash offset
+};
 
 struct ctx {
   struct slip slip;  // SLIP state machine
-  const char *baud;  // Baud rate
-  const char *port;  // Serial port
+  const char *baud;  // Baud rate, e.g. "115200"
+  const char *port;  // Serial port, e.g. "/dev/ttyUSB0"
   const char *fpar;  // Flash params, e.g. "0x220"
-  const char *fsiz;  // Flash size, e.g. "4194304"
   bool verbose;      // Hexdump serial comms
   int fd;            // Serial port file descriptor
-  uint32_t chip_id;  // Numeric chip ID value
+  struct chip chip;  // Chip descriptor
+};
+
+static struct chip s_known_chips[] = {
+    {0, "Unknown", 0},
+    {CHIP_ID_ESP8266, "ESP8266", 0},
+    {CHIP_ID_ESP32, "ESP32", 4096},
+    {CHIP_ID_ESP32_C3_ECO_1_2, "ESP32-C3-ECO2", 0},
+    {CHIP_ID_ESP32_C3_ECO3, "ESP32-C3-ECO3", 0},
+    {CHIP_ID_ESP32_S2, "ESP32-S2", 0},
+    {CHIP_ID_ESP32_S3_BETA2, "ESP32-S3-BETA2", 0},
+    {CHIP_ID_ESP32_S3_BETA2, "ESP32-S3-BETA3", 0},
+    {CHIP_ID_ESP32_S3_BETA2, "ESP32-C6-BETA", 0},
 };
 
 static int s_signo;
@@ -87,19 +103,17 @@ static void dump(const char *label, const uint8_t *buf, size_t len) {
          hexdump(buf, len, tmp, sizeof(tmp)));
 }
 
-static void uart_tx(unsigned char byte, void *arg) {
-  int len = write(*(int *) arg, &byte, 1);
-  (void) len;  // Shut up GCC
+static void uart_tx(unsigned char ch, void *arg) {
+  int fd = *(int *) arg;
+  if (write(fd, &ch, 1) != 1) fail("failed to write %d to fd %d", ch, fd);
 }
 
 static void usage(struct ctx *ctx) {
-  printf("Defaults: BAUD=%s, PORT=%s, FLASH_PARAMS=%s, FLASH_SIZE=%s\n",
-         ctx->baud, ctx->port, ctx->fpar, ctx->fsiz);
+  printf("Defaults: BAUD=%s, PORT=%s\n", ctx->baud, ctx->port);
   printf("Usage:\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
-  printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
-  printf("[-fs FLASH_SIZE] flash OFFSET BINFILE ...\n");
+  printf("  esputil [-v] [-b BAUD] [-p PORT] flash OFFSET BINFILE ...\n");
   printf("  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...\n");
   exit(EXIT_FAILURE);
 }
@@ -118,21 +132,25 @@ static void flushio(int fd) {
   tcflush(fd, TCIOFLUSH);
 }
 
+static void sleep_ms(int milliseconds) {
+  usleep(milliseconds * 1000);
+}
+
 static void hard_reset(int fd) {
   set_dtr(fd, false);  // IO0 -> HIGH
   set_rts(fd, true);   // EN -> LOW
-  usleep(100 * 1000);  // Wait
+  sleep_ms(100);       // Wait
   set_rts(fd, false);  // EN -> HIGH
 }
 
 static void reset_to_bootloader(int fd) {
-  usleep(100 * 1000);  // Wait
+  sleep_ms(100);       // Wait
   set_dtr(fd, false);  // IO0 -> HIGH
   set_rts(fd, true);   // EN -> LOW
-  usleep(100 * 1000);  // Wait
+  sleep_ms(100);       // Wait
   set_dtr(fd, true);   // IO0 -> LOW
   set_rts(fd, false);  // EN -> HIGH
-  usleep(50 * 1000);   // Wait
+  sleep_ms(50);        // Wait
   set_dtr(fd, false);  // IO0 -> HIGH
   flushio(fd);         // Discard all data
 }
@@ -162,20 +180,6 @@ static speed_t termios_baud(int baud) {
     }
 }
 
-static const char *chip_id_to_str(uint32_t id) {
-  switch (id) {
-    case CHIP_ID_ESP32:             return "ESP32";
-    case CHIP_ID_ESP32_S2:          return "ESP32-S2";
-    case CHIP_ID_ESP32_C3_ECO_1_2:  return "ESP32-C3-ECO1+2";
-    case CHIP_ID_ESP32_C3_ECO3:     return "ESP32-C3-ECO3";
-    case CHIP_ID_ESP8266:           return "ESP8266";
-    case CHIP_ID_ESP32_C6_BETA:     return "ESP32-C6-BETA";
-    case CHIP_ID_ESP32_S3_BETA2:    return "ESP32-S3-BETA2";
-    case CHIP_ID_ESP32_S3_BETA3:    return "ESP32-S3-BETA3";
-    default: return "Unknown";
-  }
-}
-
 static const char *ecode_to_str(int ecode) {
   switch (ecode) {
     case 5: return "Received message is invalid";
@@ -186,6 +190,24 @@ static const char *ecode_to_str(int ecode) {
     case 10: return "Flash read length error";
     case 11: return "Deflate error";
     default: return "Unknown error";
+  }
+}
+
+static const char *cmdstr(int code) {
+  switch (code) {
+    case 2: return "FLASH_BEGIN";
+    case 3: return "FLASH_DATA";
+    case 4: return "FLASH_END";
+    case 5: return "MEM_BEGIN";
+    case 6: return "MEM_END" ;
+    case 7: return "MEM_DATA";
+    case 8: return "SYNC";
+    case 9: return "WRITE_REG";
+    case 10: return "READ_REG";
+    case 11: return "SPI_SET_PARAMS";
+    case 13: return "SPI_ATTACH";
+    case 15: return "CHANGE_BAUD_RATE";
+    default: return "CMD_UNKNOWN";
   }
 }
 // clang-format on
@@ -240,22 +262,23 @@ static int cmd(struct ctx *ctx, uint8_t op, void *buf, uint16_t len,
   memcpy(&tmp[4], &cs, 4);    // Checksum
   memcpy(&tmp[8], buf, len);  // Data
 
-  slip_send(tmp, 8 + len, uart_tx, &ctx->fd);  // Send command
-  if (ctx->verbose) dump("W", tmp, 8 + len);   // Hexdump if required
+  slip_send(tmp, 8 + len, uart_tx, &ctx->fd);        // Send command
+  if (ctx->verbose) dump(cmdstr(op), tmp, 8 + len);  // Hexdump if required
 
   fd_set rset = iowait(ctx->fd, timeout_ms);  // Wait until device is ready
   if (!FD_ISSET(ctx->fd, &rset)) return 1;    // Interrupted, fail
   int n = read(ctx->fd, tmp, sizeof(tmp));    // Read from a device
   if (n <= 0) fail("Serial line closed\n");   // Doh. Unplugged maybe?
-  // if (verbose) dump("R", tmp, n);
+  // if (ctx->verbose) dump("READ", tmp, n);
   for (int i = 0; i < n; i++) {
     size_t r = slip_recv(tmp[i], &ctx->slip);  // Pass to SLIP state machine
     if (r == 0 && ctx->slip.mode == 0) putchar(tmp[i]);  // In serial mode
     if (r == 0) continue;
-    if (ctx->verbose) dump("R", ctx->slip.buf, r);
+    if (ctx->verbose) dump(">RESPONSE", ctx->slip.buf, r);
     if (r < 10 || ctx->slip.buf[0] != 1 || ctx->slip.buf[1] != op) continue;
     // ESP8266's error indicator is in the 2 last bytes, ESP32's - last 4
-    int eofs = ctx->chip_id == CHIP_ID_ESP8266 ? r - 2 : r - 4;
+    int eofs =
+        ctx->chip.id == 0 || ctx->chip.id == CHIP_ID_ESP8266 ? r - 2 : r - 4;
     int ecode = ctx->slip.buf[eofs] ? ctx->slip.buf[eofs + 1] : 0;
     if (ecode) printf("error %d: %s\n", ecode, ecode_to_str(ecode));
     return ecode;
@@ -263,9 +286,20 @@ static int cmd(struct ctx *ctx, uint8_t op, void *buf, uint16_t len,
   return 42;
 }
 
-static int read_reg(struct ctx *ctx, uint32_t addr) {
-  return cmd(ctx, 10, &addr, sizeof(addr), 0, 200);
+static int read32(struct ctx *ctx, uint32_t addr, uint32_t *value) {
+  int ok = cmd(ctx, 10, &addr, sizeof(addr), 0, 100);
+  if (ok == 0 && value != NULL) *value = *(uint32_t *) &ctx->slip.buf[4];
+  return ok;
 }
+
+// Read chip ID from ROM and setup ctx->chip pointer
+static void chip_detect(struct ctx *ctx) {
+  if (read32(ctx, 0x40001000, &ctx->chip.id)) fail("Error reading chip ID\n");
+  size_t i, nchips = sizeof(s_known_chips) / sizeof(s_known_chips[0]);
+  for (i = 0; i < nchips; i++) {
+    if (s_known_chips[i].id == ctx->chip.id) ctx->chip = s_known_chips[i];
+  }
+};
 
 // Assume chip is rebooted and is in download mode.
 // Send SYNC commands until success, and detect chip ID
@@ -275,11 +309,9 @@ static bool chip_connect(struct ctx *ctx) {
     uint8_t data[36] = {7, 7, 0x12, 0x20};
     memset(data + 4, 0x55, sizeof(data) - 4);
     if (cmd(ctx, 8, data, sizeof(data), 0, 250) == 0) {
-      usleep(50 * 1000);
+      sleep_ms(50);
       flushio(ctx->fd);  // Discard all data
-      // Detect chip ID
-      if (read_reg(ctx, 0x40001000)) fail("Error reading ID\n");
-      ctx->chip_id = *(uint32_t *) &ctx->slip.buf[4];
+      chip_detect(ctx);
       return true;
     }
     flushio(ctx->fd);
@@ -312,14 +344,12 @@ static void monitor(struct ctx *ctx) {
 
 static void info(struct ctx *ctx) {
   if (!chip_connect(ctx)) fail("Error connecting\n");
-  printf("Chip ID: 0x%x (%s)\n", ctx->chip_id, chip_id_to_str(ctx->chip_id));
+  printf("Chip ID: 0x%x (%s)\n", ctx->chip.id, ctx->chip.name);
 
-  if (ctx->chip_id == CHIP_ID_ESP32_C3_ECO3) {
-    uint32_t efuse_base = 0x60008800;
-    read_reg(ctx, efuse_base + 0x44);
-    uint32_t mac0 = *(uint32_t *) &ctx->slip.buf[4];
-    read_reg(ctx, efuse_base + 0x48);
-    uint32_t mac1 = *(uint32_t *) &ctx->slip.buf[4];
+  if (ctx->chip.id == CHIP_ID_ESP32_C3_ECO3) {
+    uint32_t efuse_base = 0x60008800, mac0, mac1;
+    read32(ctx, efuse_base + 0x44, &mac0);
+    read32(ctx, efuse_base + 0x48, &mac1);
     printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", (mac1 >> 8) & 255,
            mac1 & 255, (mac0 >> 24) & 255, (mac0 >> 16) & 255,
            (mac0 >> 8) & 255, mac0 & 255);
@@ -329,9 +359,33 @@ static void info(struct ctx *ctx) {
 static void flash(struct ctx *ctx, const char **args) {
   if (!chip_connect(ctx)) fail("Error connecting\n");
 
-  if (read_reg(ctx, 0x40001000)) fail("Error reading ID\n");
-  ctx->chip_id = *(uint32_t *) &ctx->slip.buf[4];
+  uint16_t flash_params = 0;
+  if (ctx->fpar != NULL) flash_params = strtoul(ctx->fpar, NULL, 0);
 
+  // For non-ESP8266, SPI attach is mandatory
+  if (ctx->chip.id != CHIP_ID_ESP8266) {
+    uint32_t d3[] = {0, 0};
+    if (cmd(ctx, 13, d3, sizeof(d3), 0, 250)) fail("SPI_ATTACH failed\n");
+    // flash_id, flash size, block_size, sector_size, page_size, status_mask
+    uint32_t d4[] = {0, 4 * 1024 * 1024, 65536, 4096, 256, 0xffff};
+    if (cmd(ctx, 11, d4, sizeof(d4), 0, 250)) fail("SPI_SET_PARAMS failed\n");
+
+    // Load first word from the bootloader - flash params are encoded there,
+    // in the last 2 bytes, see README.md in the repo root
+    if (ctx->fpar == NULL) {
+      uint32_t d5[] = {ctx->chip.bla, 4, 4096, 4, 1};
+      if (cmd(ctx, 14, d5, sizeof(d5), 0, 200) != 0) {
+        printf("Error: can't read bootloader @ addr %#x\n", ctx->chip.bla);
+      } else if (ctx->slip.buf[8] != 0xe9) {
+        printf("Wrong magic for bootloader @ addr %#x\n", ctx->chip.bla);
+      } else {
+        flash_params = (ctx->slip.buf[10] << 8) | ctx->slip.buf[11];
+      }
+    }
+  }
+  if (ctx->verbose) printf("Using flash params %#hx\n", flash_params);
+
+  // #define ALIGN(a, b) (((a) + (b) -1) / (b) * (b))
   // Iterate over arguments: FLASH_OFFSET FILENAME ...
   while (args[0] && args[1]) {
     uint32_t flash_offset = strtoul(args[0], NULL, 0);
@@ -340,15 +394,6 @@ static void flash(struct ctx *ctx, const char **args) {
     fseek(fp, 0, SEEK_END);
     int seq = 0, n, size = ftell(fp);
     rewind(fp);
-
-    // For non-ESP8266, SPI attach is mandatory
-    if (ctx->chip_id != CHIP_ID_ESP8266) {
-      uint32_t d3[] = {0, 0};
-      if (cmd(ctx, 13, d3, sizeof(d3), 0, 250)) fail("SPI_ATTACH failed\n");
-      // 0, flash size, block_size, sector_size, page_size, status_mask
-      uint32_t d4[] = {0, atoi(ctx->fsiz), 65536, 4096, 256, 0xffff};
-      if (cmd(ctx, 11, d4, sizeof(d4), 0, 250)) fail("SPI_SET_PARAMS failed\n");
-    }
 
     uint32_t block_size = 4096, hs = 16;
     uint8_t buf[hs + block_size];  // Initial 16 bytes are for serial cmd
@@ -360,41 +405,52 @@ static void flash(struct ctx *ctx, const char **args) {
     uint32_t d1[] = {size, num_blocks, block_size, flash_offset, encrypted};
     uint16_t d1size = sizeof(d1) - 4;
 
-    if (ctx->chip_id == CHIP_ID_ESP32_S2 ||
-        ctx->chip_id == CHIP_ID_ESP32_S3_BETA2 ||
-        ctx->chip_id == CHIP_ID_ESP32_S3_BETA3 ||
-        ctx->chip_id == CHIP_ID_ESP32_C6_BETA ||
-        ctx->chip_id == CHIP_ID_ESP32_C3_ECO_1_2 ||
-        ctx->chip_id == CHIP_ID_ESP32_C3_ECO3)
+    if (ctx->chip.id == CHIP_ID_ESP32_S2 ||
+        ctx->chip.id == CHIP_ID_ESP32_S3_BETA2 ||
+        ctx->chip.id == CHIP_ID_ESP32_S3_BETA3 ||
+        ctx->chip.id == CHIP_ID_ESP32_C6_BETA ||
+        ctx->chip.id == CHIP_ID_ESP32_C3_ECO_1_2 ||
+        ctx->chip.id == CHIP_ID_ESP32_C3_ECO3)
       d1size += 4;
-    if (cmd(ctx, 2, d1, d1size, 0, 5000)) fail("flash_begin failed\n");
+
+    printf("Erasing %d bytes @ %#x", size, flash_offset);
+    fflush(stdout);
+    if (cmd(ctx, 2, d1, d1size, 0, 15000)) fail("\nflash_begin/erase failed\n");
 
     // Read from file into a buffer, but skip initial 16 bytes
     while ((n = fread(buf + hs, 1, block_size, fp)) > 0) {
       int oft = ftell(fp);
-      printf("Writing %s, %d bytes at flash offset 0x%x (%d%%)\n", args[1], n,
+      for (int i = 0; i < 100; i++) putchar('\b');
+      printf("Writing %s, %d/%d bytes @ 0x%x (%d%%)", args[1], n, size,
              flash_offset + oft - n, oft * 100 / size);
+      fflush(stdout);
 
       // Embed flash params into an image
       // TODO(cpq): don't hardcode, detect them
       if (seq == 0) {
-        uint16_t flash_params = (uint16_t) strtoul(ctx->fpar, NULL, 0);
-        buf[hs + 2] = (uint8_t) ((flash_params >> 8) & 255);
-        buf[hs + 3] = (uint8_t) (flash_params & 255);
-
+        if (flash_offset == ctx->chip.bla && flash_params != 0) {
+          buf[hs + 2] = (uint8_t) ((flash_params >> 8) & 255);
+          buf[hs + 3] = (uint8_t) (flash_params & 255);
+        }
         // Set chip type in the extended header at offset 4.
         // Common header is 8, plus extended header offset 4 = 12
-        if (ctx->chip_id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 12] = 5;
-        if (ctx->chip_id == CHIP_ID_ESP32_C3_ECO_1_2) buf[hs + 12] = 5;
+        if (ctx->chip.id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 12] = 5;
+        if (ctx->chip.id == CHIP_ID_ESP32_C3_ECO_1_2) buf[hs + 12] = 5;
       }
+
+      // Align buffer to block_size and pad with 0xff
+      // memset(buf + hs + n, 255, sizeof(buf) - hs - n);
+      // n = ALIGN(n, block_size);
 
       // Flash write
       *(uint32_t *) &buf[0] = n;      // Populate initial bytes - size
       *(uint32_t *) &buf[4] = seq++;  // And sequence numner
-      if (cmd(ctx, 3, buf, hs + n, checksum(buf + hs, n), 1500))
-        fail("flash_data failed\n");
+      uint8_t cs = checksum(buf + hs, n);
+      if (cmd(ctx, 3, buf, hs + n, cs, 1500)) fail("flash_data failed\n");
     }
 
+    for (int i = 0; i < 100; i++) printf("\b \b");
+    printf("Written %s, %d bytes @ %#x\n", args[1], size, flash_offset);
     fclose(fp);
     args += 2;
   }
@@ -469,25 +525,21 @@ int main(int argc, const char **argv) {
   struct ctx ctx = {
       .port = getenv("PORT"),          // Serial port
       .baud = getenv("BAUD"),          // Serial port baud rate
-      .fpar = getenv("FLASH_PARAMS"),  // Flash params
-      .fsiz = getenv("FLASH_SIZE"),    // Flash size
+      .fpar = getenv("FLASH_PARAMS"),  // Flash parameters
       .slip = {.buf = slipbuf, .size = sizeof(slipbuf)},  // SLIP context
+      .chip = s_known_chips[0],                           // Set chip to unknown
   };
   if (ctx.port == NULL) ctx.port = "/dev/ttyUSB0";
   if (ctx.baud == NULL) ctx.baud = "115200";
-  if (ctx.fpar == NULL) ctx.fpar = "0x21f";
-  if (ctx.fsiz == NULL) ctx.fsiz = "4194304";
 
   // Parse options
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
       ctx.baud = argv[++i];
-    } else if (strcmp(argv[i], "-fp") == 0 && i + 1 < argc) {
-      ctx.fpar = argv[++i];
-    } else if (strcmp(argv[i], "-fs") == 0 && i + 1 < argc) {
-      ctx.fsiz = argv[++i];
     } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
       ctx.port = argv[++i];
+    } else if (strcmp(argv[i], "-fp") == 0 && i + 1 < argc) {
+      ctx.fpar = argv[++i];
     } else if (strcmp(argv[i], "-v") == 0) {
       ctx.verbose = true;
     } else if (argv[i][0] == '-') {

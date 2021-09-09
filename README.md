@@ -219,12 +219,10 @@ The image should be of the following format:
    V     - Chip revision
 ```
 
-By default, `esputil` uses flash params `0x21f`, which means 4MB chip,
-80 MHz frequency. In order to set a different value, use
-`-fp 0x..`  argument, or `FPARAMS=0x...` make variable.
-These two commands are equivalent:
+By default, `esputil` uses fetches flash params `FP1` and `FP2` from the
+existing bootloader. It is possible to manually set flash params via the `-fp`
+flag, for example `fp 0x22f` sets flash to DIO, 4MB, 80MHz:
 
-```
-$ make flash FPARAMS=0x21f
-$ esputil -fp 0x21f flash build/firmware.bin
+```sh
+$ esputil -fp 0x22f flash 0 build/firmware.bin
 ```
