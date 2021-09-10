@@ -40,6 +40,7 @@ struct ctx {
   const char *baud;  // Baud rate, e.g. "115200"
   const char *port;  // Serial port, e.g. "/dev/ttyUSB0"
   const char *fpar;  // Flash params, e.g. "0x220"
+  const char *fspi;  // Flash SPI pins: CLK,Q,D,HD,CS. E.g. "6,17,8,11,16"
   bool verbose;      // Hexdump serial comms
   int fd;            // Serial port file descriptor
   struct chip chip;  // Chip descriptor
@@ -116,7 +117,8 @@ static void usage(struct ctx *ctx) {
   printf("  esputil [-v] [-b BAUD] [-p PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
-  printf("flash OFFSET BINFILE ...\n");
+  printf("[-fspi FLASH_SPI] flash OFFSET BINFILE ...\n");
+  // printf("  esputil [-v] [-b BAUD] [-p PORT] cmd CMD,DATA\n");
   printf("  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...\n");
   exit(EXIT_FAILURE);
 }
@@ -370,7 +372,15 @@ static void flash(struct ctx *ctx, const char **args) {
 
   // For non-ESP8266, SPI attach is mandatory
   if (ctx->chip.id != CHIP_ID_ESP8266) {
-    uint32_t d3[] = {0, 0};
+    uint32_t pins = 0;
+    if (ctx->fspi != NULL) {
+      // 6,17,8,11,16 -> 0xb408446, like esptool does
+      unsigned a = 0, b = 0, c = 0, d = 0, e = 0;
+      sscanf(ctx->fspi, "%u,%u,%u,%u,%u", &a, &b, &c, &e, &d);
+      pins = a | (b << 6) | (c << 12) | (d << 18) | (e << 24);
+      // printf("-----> %u,%u,%u,%u,%u -> %x\n", a, b, c, d, e, pins);
+    }
+    uint32_t d3[] = {pins, 0};
     if (cmd(ctx, 13, d3, sizeof(d3), 0, 250)) fail("SPI_ATTACH failed\n");
       // flash_id, flash size, block_size, sector_size, page_size, status_mask
 #if 0
@@ -533,6 +543,7 @@ int main(int argc, const char **argv) {
       .port = getenv("PORT"),          // Serial port
       .baud = getenv("BAUD"),          // Serial port baud rate
       .fpar = getenv("FLASH_PARAMS"),  // Flash parameters
+      .fspi = getenv("FLASH_SPI"),     // Flash SPI pins
       .slip = {.buf = slipbuf, .size = sizeof(slipbuf)},  // SLIP context
       .chip = s_known_chips[0],                           // Set chip to unknown
   };
@@ -547,6 +558,8 @@ int main(int argc, const char **argv) {
       ctx.port = argv[++i];
     } else if (strcmp(argv[i], "-fp") == 0 && i + 1 < argc) {
       ctx.fpar = argv[++i];
+    } else if (strcmp(argv[i], "-fspi") == 0 && i + 1 < argc) {
+      ctx.fspi = argv[++i];
     } else if (strcmp(argv[i], "-v") == 0) {
       ctx.verbose = true;
     } else if (argv[i][0] == '-') {
