@@ -229,8 +229,8 @@ Those two bytes encode three parameters:
 - FLash size (hight 4 bits of F2 byte - can be `0`, `1`, `2`, `3`, `4`)
 - Flash frequency (low 4 bits of F2 byte - can be `0`, `1`, `2`, `f`)
 
-By default, `esputil` uses fetches flash params `FP1` and `FP2` from the
-existing bootloader, by reading first 4 bytes of the bootloader from flash.
+By default, `esputil` fetches flash params `FP1` and `FP2` from the
+existing bootloader by reading first 4 bytes of the bootloader from flash.
 It is possible to manually set flash params via the `-fp`
 flag, which is an integer value that represent 3 hex nimbles.
 For example `fp 0x22f` sets flash to DIO, 4MB, 80MHz:
