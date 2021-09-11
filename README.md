@@ -209,11 +209,10 @@ The image should be of the following format:
 
    0xe9 - Espressif image magic number. All images must start with 0xe9
    N    - a number of segments in the image
-   FP1  - flash mode. 0: QIO, 1: QOUT, 2: DIO, 3: DOUT
-   FP2  - flash size (high 4 bits) and flash frequency (low 4 bits):
+   F1  - flash mode. 0: QIO, 1: QOUT, 2: DIO, 3: DOUT
+   F2  - flash size (high 4 bits) and flash frequency (low 4 bits):
             size: 0: 1MB, 0x10: 2MB, 0x20: 4MB, 0x30: 8MB, 0x40: 16MB
             freq: 0: 40m, 1: 26m, 2: 20m, 0xf: 80m
-
    ENTRY - 4-byte entry point address in little endian
    C     - Chip ID. 0: ESP32, 5: ESP32C3
    V     - Chip revision
@@ -229,7 +228,7 @@ Those two bytes encode three parameters:
 - FLash size (hight 4 bits of F2 byte - can be `0`, `1`, `2`, `3`, `4`)
 - Flash frequency (low 4 bits of F2 byte - can be `0`, `1`, `2`, `f`)
 
-By default, `esputil` fetches flash params `FP1` and `FP2` from the
+By default, `esputil` fetches flash params `F1` and `F2` from the
 existing bootloader by reading first 4 bytes of the bootloader from flash.
 It is possible to manually set flash params via the `-fp`
 flag, which is an integer value that represent 3 hex nimbles.
