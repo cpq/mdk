@@ -382,11 +382,9 @@ static void flash(struct ctx *ctx, const char **args) {
     }
     uint32_t d3[] = {pins, 0};
     if (cmd(ctx, 13, d3, sizeof(d3), 0, 250)) fail("SPI_ATTACH failed\n");
-      // flash_id, flash size, block_size, sector_size, page_size, status_mask
-#if 0
+    // flash_id, flash size, block_size, sector_size, page_size, status_mask
     uint32_t d4[] = {0, 4 * 1024 * 1024, 65536, 4096, 256, 0xffff};
     if (cmd(ctx, 11, d4, sizeof(d4), 0, 250)) fail("SPI_SET_PARAMS failed\n");
-#endif
 
     // Load first word from the bootloader - flash params are encoded there,
     // in the last 2 bytes, see README.md in the repo root
@@ -401,7 +399,7 @@ static void flash(struct ctx *ctx, const char **args) {
       }
     }
   }
-  if (ctx->verbose) printf("Using flash params %#hx\n", flash_params);
+  printf("Using flash params %#hx\n", flash_params);
 
   // Iterate over arguments: FLASH_OFFSET FILENAME ...
   while (args[0] && args[1]) {
