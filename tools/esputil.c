@@ -169,6 +169,7 @@ static speed_t termios_baud(int baud) {
     case 57600:   return B57600;
     case 115200:  return B115200;
     case 230400:  return B230400;
+#ifndef __APPLE__
     case 460800:  return B460800;
     case 500000:  return B500000;
     case 576000:  return B576000;
@@ -181,6 +182,7 @@ static speed_t termios_baud(int baud) {
     case 3000000: return B3000000;
     case 3500000: return B3500000;
     case 4000000: return B4000000;
+#endif
     default:      return B0;
     }
 }
