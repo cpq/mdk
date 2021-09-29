@@ -218,6 +218,16 @@ static const char *cmdstr(int code) {
 }
 // clang-format on
 
+static void change_baud(int fd, int baud, bool verbose) {
+  struct termios tio;
+  if (tcgetattr(fd, &tio) != 0)
+    fail("Can't set fd %d to baud %d: %d\n", fd, baud, errno);
+  cfsetospeed(&tio, termios_baud(baud));
+  cfsetispeed(&tio, termios_baud(baud));
+  tcsetattr(fd, TCSANOW, &tio);
+  if (verbose) printf("fd %d set to baud %d\n", fd, baud);
+}
+
 static int open_serial(const char *name, int baud, bool verbose) {
   struct termios tio;
   int fd = open(name, O_RDWR | O_NOCTTY | O_SYNC);
@@ -369,6 +379,12 @@ static void flash(struct ctx *ctx, const char **args) {
 
   uint16_t flash_params = 0;
   if (ctx->fpar != NULL) flash_params = strtoul(ctx->fpar, NULL, 0);
+
+  if (atoi(ctx->baud) > 115200) {
+    uint32_t data[] = {atoi(ctx->baud), 0};
+    if (cmd(ctx, 15, data, sizeof(data), 0, 50)) fail("SET_BAUD failed\n");
+    change_baud(ctx->fd, atoi(ctx->baud), ctx->verbose);
+  }
 
   // For non-ESP8266, SPI attach is mandatory
   if (ctx->chip.id != CHIP_ID_ESP8266) {
@@ -577,7 +593,7 @@ int main(int argc, const char **argv) {
   }
 
   // Commands that require serial port. First, open serial.
-  ctx.fd = open_serial(ctx.port, atoi(ctx.baud), ctx.verbose);
+  ctx.fd = open_serial(ctx.port, 115200, ctx.verbose);
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
 
