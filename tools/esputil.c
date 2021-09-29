@@ -8,14 +8,30 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#if defined(_MSC_VER) && _MSC_VER < 1700
+#define snprintf _snprintf
+typedef unsigned __int64 uint64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef enum { false = 0, true = 1 } bool;
+#else
+#include <stdbool.h>
+#include <stdint.h>
+#endif
+#else
+#include <stdbool.h>
+#include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
+#endif
 
 #include "slip.h"  // SLIP state machine logic
 
@@ -101,9 +117,10 @@ static char *hexdump(const void *buf, size_t len, char *dst, size_t dlen) {
 }
 
 static void dump(const char *label, const uint8_t *buf, size_t len) {
-  char tmp[len * 5 + 100];  // Hexdump buffer
-  printf("%s [%d bytes]\n%s\n", label, (int) len,
-         hexdump(buf, len, tmp, sizeof(tmp)));
+  size_t n = len * 5 + 100;  // Hexdump buffer len
+  char *tmp = malloc(n);     // Hexdump buffer
+  printf("%s [%d bytes]\n%s\n", label, (int) len, hexdump(buf, len, tmp, n));
+  free(tmp);
 }
 
 static void uart_tx(unsigned char ch, void *arg) {

@@ -1,11 +1,18 @@
 CFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -Os
 BINDIR ?= .
+CWD ?= $(realpath $(CURDIR))
+DOCKER = docker run $(DA) --rm -e WINEDEBUG=-all -v $(CWD):$(CWD) -w $(CWD)
 
 all:
 	@echo available targets: slipterm esputil test examples
 
 esputil: esputil.c
 	$(CC) $(CFLAGS) $? -o $(BINDIR)/$@
+
+esputil.exe: esputil.c
+	$(DOCKER) mdashnet/vc98 wine cl /nologo /W3 /Os $? /Fe$@
+	$(DOCKER) mdashnet/vc98 wine $@
+#	$(DOCKER) mdashnet/mingw i686-w64-mingw32-gcc $(CFLAGS) $? -o $@
 
 slipterm: slipterm.c
 	$(CC) $(CFLAGS) $? -lpcap -lutil -o $(BINDIR)/$@
