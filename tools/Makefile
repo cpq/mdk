@@ -11,7 +11,7 @@ esputil: esputil.c
 
 esputil.exe: esputil.c
 	$(DOCKER) mdashnet/vc98 wine cl /nologo /W3 /Os $? /Fe$@
-	$(DOCKER) mdashnet/vc98 wine $@
+	$(DOCKER) mdashnet/vc98 wine $@ -v -p COM33 info
 #	$(DOCKER) mdashnet/mingw i686-w64-mingw32-gcc $(CFLAGS) $? -o $@
 
 slipterm: slipterm.c
@@ -29,4 +29,4 @@ examples-clean:
 	for d in ../examples/*; do make -C $$d clean ; done
 
 clean: examples-clean
-	rm -rf slipterm esputil *.dSYM *.o
+	rm -rf slipterm esputil *.dSYM *.o *.exe *.obj
