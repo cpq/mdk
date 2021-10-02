@@ -4,8 +4,10 @@
 // Use MSVC98 for _WIN32, thus ISO C90. MCVC98 links against un-versioned
 // msvcrt.dll, therefore produced .exe works everywhere.
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -16,6 +18,7 @@
 // Windows includes
 #if defined(_MSC_VER) && _MSC_VER < 1700
 #define snprintf _snprintf
+#define inline __inline
 typedef unsigned __int64 uint64_t;
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -25,14 +28,19 @@ typedef enum { false = 0, true = 1 } bool;
 #include <stdbool.h>
 #include <stdint.h>
 #endif
+#include <direct.h>
 #include <io.h>
 #include <windows.h>
+#define mkdir(x, y) _mkdir(x)
 #else
 // UNIX includes
+#include <dirent.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 #endif
@@ -139,8 +147,9 @@ static void usage(struct ctx *ctx) {
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
   printf("[-fspi FLASH_SPI] flash OFFSET BINFILE ...\n");
-  // printf("  esputil [-v] [-b BAUD] [-p PORT] cmd CMD,DATA\n");
   printf("  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...\n");
+  printf("  esputil mkhex ADDRESS1 BINFILE1 ADDRESS2 BINFILE2 ...\n");
+  printf("  esputil [-tmp TMP_DIR] unhex HEXFILE\n");
   exit(EXIT_FAILURE);
 }
 
@@ -586,7 +595,7 @@ static unsigned long align_to(unsigned long n, unsigned to) {
   return ((n + to - 1) / to) * to;
 }
 
-static void mkbin(const char *bin_path, const char *ep, const char *args[]) {
+static int mkbin(const char *bin_path, const char *ep, const char *args[]) {
   FILE *bin_fp = fopen(bin_path, "w+b");
   uint8_t common_hdr[] = {0xe9, 0, 0, 0};
   uint8_t extended_hdr[] = {0xee, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
@@ -637,12 +646,127 @@ static void mkbin(const char *bin_path, const char *ep, const char *args[]) {
   }
 
   fclose(bin_fp);
+  return EXIT_SUCCESS;
+}
+
+static void printhexline(int type, int len, int addr, int *buf) {
+  unsigned i, cs = type + len + ((addr >> 8) & 255) + (addr & 255);
+  printf(":%02x%04x%02x", len, addr & 0xffff, type);
+  for (i = 0; i < (unsigned) len; i++) cs += buf[i], printf("%02x", buf[i]);
+  printf("%02x\n", (~cs + 1) & 255);
+}
+
+static void printhexhiaddrline(unsigned long addr) {
+  int buf[2] = {(addr >> 24) & 255, (addr >> 16) & 255};
+  printhexline(4, 2, 0, buf);
+}
+
+static int mkhex(const char **args) {
+  for (; args[0] && args[1]; args += 2) {
+    unsigned long addr = strtoul(args[0], NULL, 0);
+    FILE *fp = fopen(args[1], "rb");
+    int c, n = 0, buf[16];
+    if (fp == NULL) return fail("ERROR: cannot open %s\n", args[1]);
+    // if (addr >= 0xffff && (addr & 0xffff)) printhexhiaddrline(addr);
+    printhexhiaddrline(addr);
+    for (;;) {
+      if ((c = fgetc(fp)) != EOF) buf[n++] = c;
+      if (n >= (int) (sizeof(buf) / sizeof(buf[0])) || c == EOF) {
+        if (addr >= 0xffff && !(addr & 0xffff)) printhexhiaddrline(addr);
+        if (n > 0) printhexline(0, n, addr & 0xffff, buf);
+        addr += n;
+        n = 0;
+      }
+      if (c == EOF) break;
+    }
+    fclose(fp);
+  }
+  printhexline(1, 0, 0, NULL);
+  return EXIT_SUCCESS;
+}
+
+static inline unsigned long hex_to_ul(const char *s, int len) {
+  unsigned long i = 0, v = 0;
+  for (i = 0; i < (unsigned long) len; i++) {
+    int c = s[i];
+    if (i > 0) v <<= 4;
+    v |= (c >= '0' && c <= '9')   ? c - '0'
+         : (c >= 'A' && c <= 'F') ? c - '7'
+                                  : c - 'W';
+  }
+  return v;
+}
+
+static int rmrf(const char *dirname) {
+#ifdef _WIN32
+  return !RemoveDirectory(dirname);
+#else
+  DIR *dp = opendir(dirname);
+  if (dp != NULL) {
+    struct dirent *de;
+    while ((de = readdir(dp)) != NULL) {
+      char path[PATH_MAX * 2];
+      if (de->d_name[0] == '.') continue;
+      snprintf(path, sizeof(path), "%s/%s", dirname, de->d_name);
+      remove(path);
+    }
+    closedir(dp);
+  }
+  return access(dirname, 0) == 0 ? rmdir(dirname) : EXIT_SUCCESS;
+#endif
+}
+
+static int unhex(const char *hexfile, const char *dir) {
+  char buf[600];
+  int c, n = 0, line = 0;
+  FILE *in = fopen(hexfile, "rb"), *out = NULL;
+  unsigned long upper = 0, next = 0;
+  if (in == NULL) return fail("ERROR: cannot open %s\n", hexfile);
+  if (rmrf(dir) != 0) return fail("Cannot delete dir %s\n", dir);
+  mkdir(dir, 0755);
+  while ((c = fgetc(in)) != EOF) {
+    if (!isspace(c)) buf[n++] = c;
+    if (n >= (int) sizeof(buf) || c == '\n') {
+      int i, len = hex_to_ul(buf + 1, 2);
+      unsigned long lower = hex_to_ul(buf + 3, 4);
+      int type = hex_to_ul(buf + 7, 2);
+      unsigned long addr = upper | lower;
+      if (buf[0] != ':') return fail("line %d: no colon\n", line);
+      if (n != 1 + 2 + 4 + 2 + len * 2 + 2)
+        return fail("line %d: len %d, expected %d\n", n,
+                    1 + 2 + 4 + 2 + len * 2 + 2);
+      if (type == 0) {
+        if (out == NULL || next != addr) {
+          char path[40];
+          snprintf(path, sizeof(path), "%s/%#lx.bin", dir, addr);
+          if (out != NULL) fclose(out);
+          out = fopen(path, "wb");
+          if (out == NULL) return fail("Cannot open %s", path);
+        }
+        for (i = 0; i < len; i++) {
+          int byte = hex_to_ul(buf + 9 + i * 2, 2);
+          fputc(byte, out);
+        }
+        next = addr + len;
+      } else if (type == 1) {
+        if (out != NULL) fclose(out);
+        out = NULL;
+      } else if (type == 4) {
+        upper = hex_to_ul(buf + 9, 4) << 16;
+      }
+      n = 0;
+    }
+  }
+  fclose(in);
+  if (out != NULL) fclose(out);
+  return EXIT_SUCCESS;
 }
 
 int main(int argc, const char **argv) {
-  const char **command = NULL;  // Command to perform
-  uint8_t slipbuf[32 * 1024];   // Buffer for SLIP context
-  struct ctx ctx = {0};         // Program context
+  const char *temp_dir = getenv("TMP_DIR");  // Temp dir for unhex
+  const char **command = NULL;               // Command to perform
+  uint8_t slipbuf[32 * 1024];                // Buffer for SLIP context
+  struct ctx ctx = {0};                      // Program context
   int i;
 
   ctx.port = getenv("PORT");          // Serial port
@@ -653,8 +777,16 @@ int main(int argc, const char **argv) {
   ctx.slip.size = sizeof(slipbuf);    // Buffer size
   ctx.chip = s_known_chips[0];        // Set chip to unknown
 
-  if (ctx.port == NULL) ctx.port = "/dev/ttyUSB0";  // Set some reasonable
-  if (ctx.baud == NULL) ctx.baud = "115200";        // defaults
+#ifdef _WIN32
+  if (ctx.port == NULL) ctx.port = "\\\\.\\COM3";
+#elif defined(__APPLE__)
+  if (ctx.port == NULL) ctx.port = "/dev/cu.usbmodem";
+#else
+  if (ctx.port == NULL) ctx.port = "/dev/ttyUSB0";
+#endif
+
+  if (ctx.baud == NULL) ctx.baud = "115200";  // Default baud rate
+  if (temp_dir == NULL) temp_dir = "tmp";     // Default temp dir
 
   // Parse options
   for (i = 1; i < argc; i++) {
@@ -666,6 +798,8 @@ int main(int argc, const char **argv) {
       ctx.fpar = argv[++i];
     } else if (strcmp(argv[i], "-fspi") == 0 && i + 1 < argc) {
       ctx.fspi = argv[++i];
+    } else if (strcmp(argv[i], "-tmp") == 0 && i + 1 < argc) {
+      temp_dir = argv[++i];
     } else if (strcmp(argv[i], "-v") == 0) {
       ctx.verbose = true;
     } else if (argv[i][0] == '-') {
@@ -680,8 +814,11 @@ int main(int argc, const char **argv) {
   // Commands that do not require serial port
   if (strcmp(*command, "mkbin") == 0) {
     if (!command[1] || !command[2] || !command[3] || !command[4]) usage(&ctx);
-    mkbin(command[1], command[2], &command[3]);
-    return 0;
+    return mkbin(command[1], command[2], &command[3]);
+  } else if (strcmp(*command, "mkhex") == 0) {
+    return mkhex(&command[1]);
+  } else if (strcmp(*command, "unhex") == 0) {
+    return unhex(command[1], temp_dir);
   }
 
   // Commands that require serial port. First, open serial.
