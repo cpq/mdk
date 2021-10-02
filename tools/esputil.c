@@ -4,6 +4,11 @@
 // Use MSVC98 for _WIN32, thus ISO C90. MCVC98 links against un-versioned
 // msvcrt.dll, therefore produced .exe works everywhere.
 
+// Needed by MSVC
+#define WIN32_LEAN_AND_MEAN
+#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -16,6 +21,10 @@
 
 #ifdef _WIN32
 // Windows includes
+#include <direct.h>
+#include <io.h>
+#include <windows.h>
+#define mkdir(x, y) _mkdir(x)
 #if defined(_MSC_VER) && _MSC_VER < 1700
 #define snprintf _snprintf
 #define inline __inline
@@ -28,10 +37,6 @@ typedef enum { false = 0, true = 1 } bool;
 #include <stdbool.h>
 #include <stdint.h>
 #endif
-#include <direct.h>
-#include <io.h>
-#include <windows.h>
-#define mkdir(x, y) _mkdir(x)
 #else
 // UNIX includes
 #include <dirent.h>
