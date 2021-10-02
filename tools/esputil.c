@@ -187,35 +187,60 @@ static uint8_t checksum(const uint8_t *buf, size_t len) {
   return checksum2(0xef, buf, len);
 }
 
-#ifdef _WIN32
+#ifdef _WIN32  // Windows - specific routines
 static void sleep_ms(int milliseconds) {
   Sleep(milliseconds);
 }
 
 static void flushio(int fd) {
-  (void) fd;
-}
-
-static int open_serial(const char *name, int baud, bool verbose) {
-  int fd = open(name, O_RDWR);
-  if (fd < 0) fail("open(%s): %d (%s)\n", name, fd, strerror(errno));
-  return fd;
+  PurgeComm((HANDLE) _get_osfhandle(fd), PURGE_RXCLEAR | PURGE_TXCLEAR);
 }
 
 static void change_baud(int fd, int baud, bool verbose) {
+  DCB cfg = {sizeof(cfg)};
+  HANDLE h = (HANDLE) _get_osfhandle(fd);
+  if (GetCommState(h, &cfg)) {
+    cfg.ByteSize = 8;
+    cfg.Parity = NOPARITY;
+    cfg.StopBits = ONESTOPBIT;
+    cfg.fBinary = TRUE;
+    cfg.fParity = TRUE;
+    cfg.BaudRate = baud;
+    SetCommState(h, &cfg);
+  } else {
+    fail("GetCommState(%x): %d\n", h, GetLastError());
+  }
+}
+
+static int open_serial(const char *name, int baud, bool verbose) {
+  COMMTIMEOUTS ct = {1, 0, 1, 0, MAXDWORD};  // 1 ms read timeout
+  int fd = open(name, O_RDWR | O_BINARY);
+  if (fd < 0) fail("open(%s): %s\n", name, strerror(errno));
+  change_baud(fd, baud, verbose);
+  SetCommTimeouts((HANDLE) _get_osfhandle(fd), &ct);
+  return fd;
 }
 
 static int iowait(int fd, int ms) {
-  return 0;
+  COMSTAT cs = {0};
+  DWORD errors, flags = 0;
+  int i;
+  for (i = 0; i < ms && flags == 0; i++) {
+    sleep_ms(1);
+    ClearCommError((HANDLE) _get_osfhandle(fd), &errors, &cs);
+    if (cs.cbInQue > 0) flags |= 2;  // There is something to read
+  }
+  return flags;
 }
 
 static void set_rts(int fd, bool value) {
+  EscapeCommFunction((HANDLE) _get_osfhandle(fd), value ? SETRTS : CLRRTS);
 }
 
 static void set_dtr(int fd, bool value) {
+  EscapeCommFunction((HANDLE) _get_osfhandle(fd), value ? SETDTR : CLRDTR);
 }
-
-#else
+#else   // UNIX - specific routines
 static void set_rts(int fd, bool value) {
   int v = TIOCM_RTS;
   ioctl(fd, value ? TIOCMBIS : TIOCMBIC, &v);
@@ -305,7 +330,7 @@ static int iowait(int fd, int ms) {
   if (FD_ISSET(fd, &rset)) ready |= 2;
   return ready;
 }
-#endif
+#endif  // End of UNIX-specific routines
 
 static void hard_reset(int fd) {
   set_dtr(fd, false);  // IO0 -> HIGH

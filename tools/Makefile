@@ -2,6 +2,7 @@ CFLAGS ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion -Os
 BINDIR ?= .
 CWD ?= $(realpath $(CURDIR))
 DOCKER = docker run $(DA) --rm -e WINEDEBUG=-all -v $(CWD):$(CWD) -w $(CWD)
+SERIAL_PORT ?= /dev/ttyUSB0
 
 all:
 	@echo available targets: slipterm esputil test examples
@@ -11,8 +12,12 @@ esputil: esputil.c
 
 esputil.exe: esputil.c
 	$(DOCKER) mdashnet/vc98 wine cl /nologo /W3 /Os $? /Fe$@
-	$(DOCKER) mdashnet/vc98 wine $@ -v -p COM33 info
-#	$(DOCKER) mdashnet/mingw i686-w64-mingw32-gcc $(CFLAGS) $? -o $@
+
+test_esputil_windows: esputil.exe
+	ln -fs $(SERIAL_PORT) ~/.wine/dosdevices/com55 && wine $? -p '\\.\COM55' -v info
+#	$(DOCKER) -it --device $(SERIAL_PORT) mdashnet/vc98 \
+    ln -fs $(SERIAL_PORT) /root/.wine/dosdevices/com3 ; \
+    wine $@ -v -p '\\.\COM3' monitor
 
 slipterm: slipterm.c
 	$(CC) $(CFLAGS) $? -lpcap -lutil -o $(BINDIR)/$@
