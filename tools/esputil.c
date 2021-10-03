@@ -227,9 +227,12 @@ static void change_baud(int fd, int baud, bool verbose) {
 }
 
 static int open_serial(const char *name, int baud, bool verbose) {
+  char path[100];
   COMMTIMEOUTS ct = {1, 0, 1, 0, MAXDWORD};  // 1 ms read timeout
-  int fd = open(name, O_RDWR | O_BINARY);
-  if (fd < 0) fail("open(%s): %s\n", name, strerror(errno));
+  int fd;
+  snprintf(path, sizeof(path), "%s%s", name[0] == '\\' ? "" : "\\\\.\\", name);
+  fd = open(path, O_RDWR | O_BINARY);
+  if (fd < 0) fail("open(%s): %s\n", path, strerror(errno));
   change_baud(fd, baud, verbose);
   SetCommTimeouts((HANDLE) _get_osfhandle(fd), &ct);
   return fd;
@@ -783,7 +786,7 @@ int main(int argc, const char **argv) {
   ctx.chip = s_known_chips[0];        // Set chip to unknown
 
 #ifdef _WIN32
-  if (ctx.port == NULL) ctx.port = "\\\\.\\COM3";
+  if (ctx.port == NULL) ctx.port = "COM99";
 #elif defined(__APPLE__)
   if (ctx.port == NULL) ctx.port = "/dev/cu.usbmodem";
 #else
