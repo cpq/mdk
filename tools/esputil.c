@@ -230,6 +230,7 @@ static int open_serial(const char *name, int baud, bool verbose) {
   char path[100];
   COMMTIMEOUTS ct = {1, 0, 1, 0, MAXDWORD};  // 1 ms read timeout
   int fd;
+  // If serial port is specified as e.g. "COM3", prepend "\\.\" to it
   snprintf(path, sizeof(path), "%s%s", name[0] == '\\' ? "" : "\\\\.\\", name);
   fd = open(path, O_RDWR | O_BINARY);
   if (fd < 0) fail("open(%s): %s\n", path, strerror(errno));
@@ -786,7 +787,7 @@ int main(int argc, const char **argv) {
   ctx.chip = s_known_chips[0];        // Set chip to unknown
 
 #ifdef _WIN32
-  if (ctx.port == NULL) ctx.port = "COM99";
+  if (ctx.port == NULL) ctx.port = "COM99";  // Non-existent default port
 #elif defined(__APPLE__)
   if (ctx.port == NULL) ctx.port = "/dev/cu.usbmodem";
 #else
