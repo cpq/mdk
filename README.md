@@ -187,6 +187,55 @@ implementation looks like:
 #endif
 ```
 
+# esputil
+
+`esputil` is a command line tool for managing Espressif devices. It is a
+replacement of `esptool.py`. `esputil` is written in C, its source code
+is in [tools/esputil.c](tools/esputil.c). Below is a quick reference:
+
+```sh
+$ esputil -h
+Defaults: BAUD=115200, PORT=/dev/ttyUSB0
+Usage:
+  esputil [-v] [-b BAUD] [-p PORT] monitor
+  esputil [-v] [-b BAUD] [-p PORT] info
+  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] [-fspi FLASH_SPI] flash OFFSET BINFILE ...
+  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...
+  esputil mkhex ADDRESS1 BINFILE1 ADDRESS2 BINFILE2 ...
+  esputil [-tmp TMP_DIR] unhex HEXFILE
+```
+
+Example: flash MDK-built ESP32C3 firmware:
+
+```sh
+$ esputil flash 0 ./build/firmware.bin
+```
+
+Example: flash ESP-IDF built firmware on ESP32-PICO-Kit board:
+
+```sh
+$ esputil -fspi 6,17,8,11,16 flash 
+  0x1000 build/bootloader/bootloader.bin \
+  0x8000 build/partitions.bin \
+  0xe000 build/ota_data_initial.bin \
+  0x10000 build/firmware.bin
+```
+
+# Build esputil
+
+Linux, Macos:
+
+```sh
+$ make -C tools esputil
+```
+
+Windows. Start command prompt in MDK root, then:
+```sh
+Clang: 'C:\Program Files\LLVM\bin\clang.exe' -v -o esputil.exe tools\esputil.c
+TCC: 'C:\Program Files\tcc\tcc.exe' -v -o esputil.exe tools\esputil.c
+MSVC (from Developer Command Prompt): cl tools\esputil.c
+```
+
 # ESP32 flashing
 
 Flashing ESP32 chips is done via UART. In order to do so, ESP32 should be
