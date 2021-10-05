@@ -221,19 +221,30 @@ $ esputil -fspi 6,17,8,11,16 flash
   0x10000 build/firmware.bin
 ```
 
-# Build esputil
+## Build esputil
 
-Linux, Macos:
+**Linux, macOS:**
 
 ```sh
 $ make -C tools esputil
 ```
 
-Windows. Start command prompt in MDK root, then:
+**Windows:**  
+Choose one of the below compilers, and use the provided command from the mdk root folder. Check to make sure the path points to where you installed the compiler.
+
+[Clang](https://releases.llvm.org/download.html): (From PowerShell)
+```powershell
+& 'C:\Program Files\LLVM\bin\clang.exe' -v -o esputil.exe tools\esputil.c
+```
+
+[TCC](http://download.savannah.gnu.org/releases/tinycc/): (From PowerShell)
+```powershell
+& 'C:\Program Files\tcc\tcc.exe' -v -o esputil.exe tools\esputil.c
+```
+
+MSVC: (From Developer Command Prompt)
 ```sh
-Clang: 'C:\Program Files\LLVM\bin\clang.exe' -v -o esputil.exe tools\esputil.c
-TCC: 'C:\Program Files\tcc\tcc.exe' -v -o esputil.exe tools\esputil.c
-MSVC (from Developer Command Prompt): cl tools\esputil.c
+cl tools\esputil.c
 ```
 
 # ESP32 flashing
