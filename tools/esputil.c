@@ -449,7 +449,7 @@ static void monitor(struct ctx *ctx) {
     int n = read(ctx->fd, buf, sizeof(buf));   // Read from a device
     if (n <= 0) fail("Serial line closed\n");  // If serial is closed, exit
 
-    if (ctx->verbose) dump("R", buf, n);
+    if (n > 0 && ctx->verbose) dump("READ", buf, n);
     for (i = 0; i < n; i++) {
       size_t len = slip_recv(buf[i], &ctx->slip);            // Pass to SLIP
       if (len == 0 && ctx->slip.mode == 0) putchar(buf[i]);  // In serial mode
@@ -461,6 +461,7 @@ static void monitor(struct ctx *ctx) {
   if (ready & 1) {  // Forward stdin to a device
     uint8_t buf[BUFSIZ];
     int n = read(0, buf, sizeof(buf));
+    if (n > 0 && ctx->verbose) dump("WRITE", buf, n);
     for (i = 0; i < n; i++) uart_tx(buf[i], &ctx->fd);
   }
 }
