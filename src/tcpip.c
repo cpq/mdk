@@ -80,9 +80,9 @@ struct arp_entry {
   uint32_t ip;
 } __attribute__((packed));
 
-#define U16(ptr) ((((uint16_t)(ptr)[0]) << 8) | (ptr)[1])
-#define NET16(x) __builtin_bswap16(x)
-#define NET32(x) __builtin_bswap32(x)
+#define U16(ptr) ((((uint16_t) (ptr)[0]) << 8) | (ptr)[1])
+#define NET16(x) ((((x) &255) << 8) | (((x) >> 8) & 255))
+//#define NET32(x) __builtin_bswap32(x)
 
 #define CNIP_ARP_CACHE_SIZE 10
 static struct arp_entry s_arp_cache[CNIP_ARP_CACHE_SIZE];  // ARP cache
@@ -128,7 +128,7 @@ static void net_icmp(struct net_if *ifp, struct eth *eth, struct ip *ip,
     icmp->type = 0;
     icmp->csum = 0;  // Important - clear csum before recomputing
     icmp->csum = ipcsum((uint8_t *) icmp, (uint8_t *) (icmp + 1) + len);
-    size_t n = (size_t)((char *) (icmp + 1) - (char *) eth) + len;
+    size_t n = (size_t) ((char *) (icmp + 1) - (char *) eth) + len;
     ifp->dbg("ICMP response %d\n", n);
     ifp->out(eth, n);
   }

@@ -2,52 +2,28 @@ MDK      ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 PROG     ?= firmware
 ARCH     ?= ESP32C3
 COMPILER ?= riscv32-tcc
-OBJ_DIR  ?= ./build
 ESPUTIL  ?= esputil
-
-# -g3 pulls enums and defines into the debug info for GDB
-# -ffunction-sections -fdata-sections, -Wl,--gc-sections remove unused code
-# strict WARNFLAGS protect from stupid mistakes
+OBJ_DIR  ?= ./build
 
 DEFS      ?=
 INCLUDES  ?= -I. -I$(MDK)/src -I$(MDK)/src/libc -I$(MDK)/tools/tcc/include -D$(ARCH) -nostdinc
-WARNFLAGS ?= -W -Wall
-OPTFLAGS  ?= -O2
-CFLAGS    ?= $(WARNFLAGS) $(OPTFLAGS) $(MCUFLAGS) $(INCLUDES) $(DEFS) $(EXTRA_CFLAGS)
-LINKFLAGS ?= $(MCUFLAGS) -T$(MDK)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
+CFLAGS    ?= -W -Wall -O2 -nostdinc $(INCLUDES) $(DEFS) $(EXTRA_CFLAGS)
 
-SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
+#SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(MDK)/src/*.c)
 HEADERS += $(wildcard $(MDK)/src/*.h)
-O1       = $(SOURCES:%.c=$(OBJ_DIR)/%.o)
-O2       = $(O1:%.cpp=$(OBJ_DIR)/%.o)
-OBJECTS  = $(O2:%.s=$(OBJ_DIR)/%.o)
 
 build: $(OBJ_DIR)/$(PROG).bin
-$(OBJECTS): $(HEADERS)
 
-unix: MCUFLAGS =
-unix: OPTFLAGS = -O0 -g3
+#unix: CFLAGS = -W -Wall -Wextra -O0 -g3
 unix: SRCS = $(filter-out %.s,$(filter-out $(MDK)/src/malloc.c,$(SOURCES)))
 unix: $(SRCS)
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(SRCS) -o $(OBJ_DIR)/firmware
 
-$(OBJ_DIR)/%.o: %.c
-	@mkdir -p $(dir $@)
-	$(COMPILER) $(CFLAGS) -c $< -o $@
-
-$(OBJ_DIR)/%.o: %.cpp
-	@mkdir -p $(dir $@)
-	$(COMPILER) $(CFLAGS) -c $< -o $@
-
-$(OBJ_DIR)/%.o: %.s
-	@mkdir -p $(dir $@)
-	$(COMPILER) $(CFLAGS) -c $< -o $@
-
 $(OBJ_DIR)/$(PROG).elf: $(OBJECTS)
-	$(COMPILER) -Xlinker $(OBJECTS) $(LINKFLAGS) -o $@
-#	$(COMPILER)-size $@
+	@mkdir -p $(dir $@)
+	$(COMPILER) $(SOURCES) $(CFLAGS) -nostdlib -o $@
 
 # elf_section_load_address FILE,SECTION_NAME
 elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep -F $2 | tr -s ' ' | cut -d ' ' -f 5)
