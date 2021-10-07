@@ -8,6 +8,11 @@ OBJ_DIR  ?= ./build
 DEFS      ?=
 INCLUDES  ?= -I. -I$(MDK)/src -I$(MDK)/src/libc -I$(MDK)/tools/tcc/include -D$(ARCH) -nostdinc
 CFLAGS    ?= -W -Wall -O2 -nostdinc $(INCLUDES) $(DEFS) $(EXTRA_CFLAGS)
+LINKFLAGS ?= -nostdlib \
+             -Wl,--defsym=memset=0x40000354 \
+             -Wl,--defsym=strlen=0x40000374 \
+             -Wl,--defsym=memcpy=0x40000358 \
+             -Wl,--defsym=memcmp=0x40000360
 
 #SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
 SOURCES += $(wildcard $(MDK)/src/*.c)
@@ -23,7 +28,7 @@ unix: $(SRCS)
 
 $(OBJ_DIR)/$(PROG).elf: $(OBJECTS)
 	@mkdir -p $(dir $@)
-	$(COMPILER) $(SOURCES) $(CFLAGS) -nostdlib -o $@
+	$(COMPILER) $(SOURCES) $(CFLAGS) $(LINKFLAGS) -o $@
 
 # elf_section_load_address FILE,SECTION_NAME
 elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep -F $2 | tr -s ' ' | cut -d ' ' -f 5)

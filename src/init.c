@@ -53,7 +53,7 @@ static void clock_init(void) {
 }
 
 // Initialise memory and other low level stuff, and call main()
-void _reset(void) {
+void _start(void) {
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
   char _sbss, _ebss, _end, _eram;
 #else
