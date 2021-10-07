@@ -17,7 +17,7 @@ esputil.exe: esputil.c
 
 tcc: riscv32-tcc
 riscv32-tcc:
-	$(COMPILER) tcc/tcc.c -DTCC_TARGET_RISCV32 -DTCC_VERSION=\""0.9.27\"" $(CFLAGS) -o $@
+	$(COMPILER) tcc/tcc.c -DTCC_TARGET_RISCV32 -DTCC_VERSION=\""0.9.27\"" $(CFLAGS) -w -O0 -o $@
 
 test_esputil_windows: esputil.exe
 	ln -fs $(SERIAL_PORT) ~/.wine/dosdevices/com55 && wine $? -p '\\.\COM55' -v info

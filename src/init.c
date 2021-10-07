@@ -36,12 +36,6 @@ void *sbrk(int diff) {
   return old;
 }
 
-void __assert_func(const char *a, int b, const char *c, const char *d) {
-  sdk_log("ASSERT %s %d %s %s\n", a, b, c, d);
-  gpio_output(LED1);
-  for (;;) spin(199999), gpio_toggle(LED1);
-}
-
 static void clock_init(void) {
 #if defined(ESP32C3)
   // TRM 6.2.4.1
@@ -59,13 +53,15 @@ static void clock_init(void) {
 }
 
 // Initialise memory and other low level stuff, and call main()
-void start(void) {
+void _reset(void) {
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
   char _sbss, _ebss, _end, _eram;
 #else
   extern char _sbss, _ebss, _end, _eram;
 #endif
-  for (char *p = &_sbss; p < &_ebss;) *p++ = '\0';
+  for (char *p = &_sbss; p < &_ebss;) {
+    *p++ = '\0';
+  }
   heap_init(&_end, &_eram);
   clock_init();
   main();

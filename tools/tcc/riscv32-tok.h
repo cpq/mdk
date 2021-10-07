@@ -78,6 +78,7 @@
  DEF_ASM(sub)
  DEF_ASM(lui)
  DEF_ASM(auipc)
+ DEF_ASM(nop)
 
 /* Logical */
 
@@ -103,6 +104,7 @@
  DEF_ASM(bge)
  DEF_ASM(bltu)
  DEF_ASM(bgeu)
+ DEF_ASM(j)
 
 /* Sync */
 

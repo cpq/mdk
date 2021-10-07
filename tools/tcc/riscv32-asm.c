@@ -64,6 +64,11 @@ static void asm_emit_opcode(uint32_t opcode) {
 static void asm_nullary_opcode(TCCState *s1, int token)
 {
     switch (token) {
+
+    case TOK_ASM_nop: // (pseudo)
+        gen_le16(0x0001);
+        return;
+
     // Sync instructions
 
     case TOK_ASM_fence: // I
@@ -164,6 +169,9 @@ static void asm_unary_opcode(TCCState *s1, int token)
     opcode |= ENCODE_RD(op.reg);
 
     switch (token) {
+    case TOK_ASM_j:
+        asm_emit_opcode(0x6f);  // j 0
+        return;
     case TOK_ASM_rdcycle:
         asm_emit_opcode(opcode | (0xC00 << 20));
         return;
@@ -545,6 +553,7 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_mrth:
     case TOK_ASM_hrts:
     case TOK_ASM_wfi:
+    case TOK_ASM_nop:
         asm_nullary_opcode(s1, token);
         return;
 
@@ -554,6 +563,7 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_rdtimeh:
     case TOK_ASM_rdinstret:
     case TOK_ASM_rdinstreth:
+    case TOK_ASM_j:
         asm_unary_opcode(s1, token);
         return;
 
