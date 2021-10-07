@@ -993,6 +993,10 @@ struct TCCState {
     /* for warnings/errors for object files */
     const char *current_filename;
 
+    /* for keeping --Wl,--defsym=xxx */
+    char **defsyms;
+    int nb_defsyms;
+
     /* used by main and tcc_parse_args only */
     struct filespec **files; /* files seen on command line */
     int nb_files; /* number thereof */

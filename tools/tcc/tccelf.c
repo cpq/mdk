@@ -897,6 +897,22 @@ static void sort_syms(TCCState *s1, Section *s)
     tcc_free(old_to_new_syms);
 }
 
+ST_FUNC int find_defsym(TCCState *s1, const char *name, addr_t *addr)
+{
+    int i, n = strlen(name);
+    // printf("LOOKING FOR DEFSYM %s\n", name);
+    for (i = 0; i < s1->nb_defsyms; i++) {
+        const char *s = s1->defsyms[i], *end = NULL;
+        int len = strlen(s);
+        // printf("LOOKING DEFSYM %s\n", s1->defsyms);
+        if (len > n + 1 && s[n] == '=' && strncmp(name, s, n) == 0) {
+            *addr = strtoull(s + n + 1, &end, 0);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* relocate symbol table, resolve undefined symbols if do_resolve is
    true and output error if undefined symbol. */
 ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
@@ -937,6 +953,7 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
                it */
             if (!strcmp(name, "_fp_hw"))
                 goto found;
+
             /* only weak symbols are accepted to be undefined. Their
                value is zero */
             sym_bind = ELFW(ST_BIND)(sym->st_info);
@@ -1773,6 +1790,8 @@ static void bind_exe_dynsyms(TCCState *s1)
                 /* XXX: _fp_hw seems to be part of the ABI, so we ignore it */
                 if (ELFW(ST_BIND)(sym->st_info) == STB_WEAK ||
                     !strcmp(name, "_fp_hw")) {
+                } else if (find_defsym(s1, name, &sym->st_value)) {
+                    /* Exists in -Wl,--defsym=NAME=ADDR */
                 } else {
                     tcc_error_noabort("undefined symbol '%s'", name);
                 }

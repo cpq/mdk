@@ -833,6 +833,9 @@ LIBTCCAPI void tcc_delete(TCCState *s1)
     dynarray_reset(&s1->library_paths, &s1->nb_library_paths);
     dynarray_reset(&s1->crt_paths, &s1->nb_crt_paths);
 
+    /* free defsyms */
+    dynarray_reset(&s1->defsyms, &s1->nb_defsyms);
+
     /* free include paths */
     dynarray_reset(&s1->include_paths, &s1->nb_include_paths);
     dynarray_reset(&s1->sysinclude_paths, &s1->nb_sysinclude_paths);
@@ -1347,6 +1350,11 @@ static int tcc_set_linker(TCCState *s, const char *option)
                 || link_option(option, "Ttext=", &p)) {
             s->text_addr = strtoull(p, &end, 16);
             s->has_text_addr = 1;
+        } else if (link_option(option, "defsym=", &p)) {
+            char *sym = tcc_mallocz(strlen(p));
+            strcpy(sym, p);
+            // printf("Adding defsym %s\n", sym);
+            dynarray_add(&s->defsyms, &s->nb_defsyms, sym);
         } else if (link_option(option, "init=", &p)) {
             copy_linker_arg(&s->init_symbol, p, 0);
             ignoring = 1;
