@@ -3,12 +3,11 @@ PROG     ?= firmware
 ARCH     ?= ESP32C3
 COMPILER ?= riscv32-tcc
 ESPUTIL  ?= esputil
-OBJ_DIR  ?= ./build
 
-DEFS      ?=
 INCLUDES  ?= -I. -I$(MDK)/src -I$(MDK)/src/libc -I$(MDK)/tools/tcc/include -D$(ARCH) -nostdinc
-CFLAGS    ?= -W -Wall -O2 -nostdinc $(INCLUDES) $(DEFS) $(EXTRA_CFLAGS)
-LINKFLAGS ?= -nostdlib \
+CFLAGS    ?= -W -Wall -O2 -nostdinc $(INCLUDES) $(EXTRA_CFLAGS)
+LINKFLAGS ?= -nostdlib -static \
+             -Wl,-image-base=0x40380400 \
              -Wl,--defsym=memset=0x40000354 \
              -Wl,--defsym=strlen=0x40000374 \
              -Wl,--defsym=memcpy=0x40000358 \
@@ -18,38 +17,27 @@ LINKFLAGS ?= -nostdlib \
 SOURCES += $(wildcard $(MDK)/src/*.c)
 HEADERS += $(wildcard $(MDK)/src/*.h)
 
-build: $(OBJ_DIR)/$(PROG).bin
+build: $(PROG).bin
 
 #unix: CFLAGS = -W -Wall -Wextra -O0 -g3
-unix: SRCS = $(filter-out %.s,$(filter-out $(MDK)/src/malloc.c,$(SOURCES)))
-unix: $(SRCS)
-	@mkdir -p $(OBJ_DIR)
-	$(CC) $(CFLAGS) $(SRCS) -o $(OBJ_DIR)/firmware
+unix: SOURCES = $(filter-out %.s,$(filter-out $(MDK)/src/malloc.c,$(SOURCES)))
+unix: $(SOURCES)
+	$(CC) $(CFLAGS) $(SOURCES) -o firmware
 
-$(OBJ_DIR)/$(PROG).elf: $(OBJECTS)
-	@mkdir -p $(dir $@)
+$(PROG).elf: $(SOURCES) $(HEADERS)
 	$(COMPILER) $(SOURCES) $(CFLAGS) $(LINKFLAGS) -o $@
 
-# elf_section_load_address FILE,SECTION_NAME
-elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep -F $2 | tr -s ' ' | cut -d ' ' -f 5)
+$(PROG).bin: $(PROG).elf
+	$(ESPUTIL) mkbin $? $@
 
-# elf_symbol_address FILE,SYMBOL
-elf_entry_point_address = $(shell $(TOOLCHAIN)-nm $1 | grep 'T $2' | cut -f1 -dT)
-
-$(OBJ_DIR)/$(PROG).bin:
-$(OBJ_DIR)/$(PROG).bin: $(OBJ_DIR)/$(PROG).elf
-	$(TOOLCHAIN)-objcopy -O binary --only-section .text $< $(OBJ_DIR)/.text.bin
-	$(TOOLCHAIN)-objcopy -O binary --only-section .data $< $(OBJ_DIR)/.data.bin
-	$(ESPUTIL) mkbin $@ $(call elf_entry_point_address,$<,_reset) $(call elf_section_load_address,$<,.data) $(OBJ_DIR)/.data.bin $(call elf_section_load_address,$<,.text) $(OBJ_DIR)/.text.bin
-
-flash: $(OBJ_DIR)/$(PROG).bin
-	$(ESPUTIL) flash $(BLOFFSET) $(OBJ_DIR)/$(PROG).bin
+flash: $(PROG).bin
+	$(ESPUTIL) flash $(BLOFFSET) $?
 
 monitor:
 	$(ESPUTIL) monitor
 
 clean:
-	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(OBJ_DIR)
+	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(PROG) $(PROG).*
 
 # esptool fallback, in case esputil does not work
 ESPTOOL   ?= python -m esptool
