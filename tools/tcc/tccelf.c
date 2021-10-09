@@ -1982,12 +1982,17 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
 	roinf->sh_offset = roinf->sh_addr = roinf->sh_size = 0;
 
         for(j = 0; j < phfill; j++) {
+
+            //if (j == 1 &&s1->data_addr) addr = phdr[1].p_vaddr = phdr[1].p_paddr = s1->data_addr;
+            if (j == 1 &&s1->data_addr) addr = ph->p_vaddr = ph->p_vaddr = s1->data_addr;
+
             ph->p_type = j == 2 ? PT_TLS : PT_LOAD;
             if (j == 0)
                 ph->p_flags = PF_R | PF_X;
             else
                 ph->p_flags = PF_R | PF_W;
             ph->p_align = j == 2 ? 4 : s_align;
+
 
             /* Decide the layout of sections loaded in memory. This must
                be done before program headers are filled since they contain
@@ -2108,8 +2113,6 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
             }
         }
     }
-
-    if (s1->data_addr) phdr[1].p_vaddr = phdr[1].p_paddr = s1->data_addr;
 
 
     /* all other sections come after */

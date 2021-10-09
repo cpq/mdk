@@ -1,3 +1,6 @@
-SOURCES = main.c
+include $(MDK)/make/build.mk
 
-include ../../make/build.mk
+SRCS = $(MDK)/src/boot/boot.c\
+       $(MDK)/src/init.c \
+       $(MDK)/src/libc.c \
+       main.c

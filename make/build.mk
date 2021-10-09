@@ -17,10 +17,9 @@ LINKFLAGS ?= -nostdlib -static \
 #             -Wl,--defsym=memcmp=0x40000360
 
 # boot.c must be first, to make _start be an entry point where .text begins
-SRCS  = $(MDK)/src/boot/boot.c
-SRCS += $(SOURCES)
-SRCS += $(wildcard $(MDK)/src/*.c)
-HDRS += $(wildcard $(MDK)/src/*.h)
+SYSS ?= $(MDK)/src/boot/boot.c $(wildcard $(MDK)/src/*.c)
+HDRS += $(wildcard $(MDK)/src/*.h) $(HEADERS)
+SRCS ?= $(SYSS) $(SOURCES)
 
 build: $(PROG).bin
 
