@@ -663,6 +663,8 @@ static int mkbin(const char *elf_path, const char *bin_path) {
   uint8_t i, j, cs = 0xef, zero = 0, num_segments = elf_get_num_segments(&elf);
   uint32_t entrypoint = elf_get_entry_point(&elf);
 
+  // GCC generates 2 segments. TCC - 4, first two are .text and .data
+  num_segments = 2;
   if (bin_fp == NULL) fail("Cannot open %s: %s\n", bin_path, strerror(errno));
   common_hdr[1] = num_segments;
   fwrite(common_hdr, 1, sizeof(common_hdr), bin_fp);      // Common header

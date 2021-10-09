@@ -2079,6 +2079,8 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
                         file_offset += s->sh_size;
                 }
             }
+
+#ifndef TCC_TARGET_RISCV32
 	    if (j == 0) {
 		/* Make the first PT_LOAD segment include the program
 		   headers itself (and the ELF header as well), it'll
@@ -2088,6 +2090,8 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
 		ph->p_vaddr &= ~(ph->p_align - 1);
 		ph->p_paddr &= ~(ph->p_align - 1);
 	    }
+#endif
+
             ph->p_filesz = file_offset - ph->p_offset;
             ph->p_memsz = addr - ph->p_vaddr;
             ph++;
@@ -2104,6 +2108,9 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
             }
         }
     }
+
+    if (s1->data_addr) phdr[1].p_vaddr = phdr[1].p_paddr = s1->data_addr;
+
 
     /* all other sections come after */
     return layout_any_sections(s1, file_offset, sec_order, 0);

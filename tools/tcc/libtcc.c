@@ -1350,6 +1350,8 @@ static int tcc_set_linker(TCCState *s, const char *option)
                 || link_option(option, "Ttext=", &p)) {
             s->text_addr = strtoull(p, &end, 16);
             s->has_text_addr = 1;
+        } else if (link_option(option, "data-base=", &p)) {
+            s->data_addr = strtoull(p, &end, 16);
         } else if (link_option(option, "defsym=", &p)) {
             char *sym = tcc_mallocz(strlen(p));
             strcpy(sym, p);

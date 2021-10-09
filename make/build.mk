@@ -3,29 +3,33 @@ PROG     ?= firmware
 ARCH     ?= ESP32C3
 COMPILER ?= riscv32-tcc
 ESPUTIL  ?= esputil
+BLOFFSET ?= 0
 
 INCLUDES  ?= -I. -I$(MDK)/src -I$(MDK)/src/libc -I$(MDK)/tools/tcc/include -D$(ARCH) -nostdinc
-CFLAGS    ?= -W -Wall -O2 -nostdinc $(INCLUDES) $(EXTRA_CFLAGS)
+CFLAGS    ?= -W -Wall -Os -nostdinc $(INCLUDES) $(EXTRA_CFLAGS)
 LINKFLAGS ?= -nostdlib -static \
              -Wl,-image-base=0x40380400 \
+             -Wl,-data-base=0x3fc88000 \
              -Wl,--defsym=memset=0x40000354 \
              -Wl,--defsym=strlen=0x40000374 \
              -Wl,--defsym=memcpy=0x40000358 \
              -Wl,--defsym=memcmp=0x40000360
 
-#SOURCES += $(MDK)/src/boot/boot_$(ARCH).s
-SOURCES += $(wildcard $(MDK)/src/*.c)
-HEADERS += $(wildcard $(MDK)/src/*.h)
+# boot.c must be first, to make _start be an entry point where .text begins
+SRCS  = $(MDK)/src/boot/boot.c
+SRCS += $(SOURCES)
+SRCS += $(wildcard $(MDK)/src/*.c)
+HDRS += $(wildcard $(MDK)/src/*.h)
 
 build: $(PROG).bin
 
 #unix: CFLAGS = -W -Wall -Wextra -O0 -g3
-unix: SOURCES = $(filter-out %.s,$(filter-out $(MDK)/src/malloc.c,$(SOURCES)))
-unix: $(SOURCES)
-	$(CC) $(CFLAGS) $(SOURCES) -o firmware
+unix: SRCS = $(filter-out %.s,$(filter-out $(MDK)/src/malloc.c,$(SRCS)))
+unix: $(SRCS)
+	$(CC) $(CFLAGS) $(SRCS) -o firmware
 
-$(PROG).elf: $(SOURCES) $(HEADERS)
-	$(COMPILER) $(SOURCES) $(CFLAGS) $(LINKFLAGS) -o $@
+$(PROG).elf: $(SRCS) $(HDRS)
+	$(COMPILER) $(SRCS) $(CFLAGS) $(LINKFLAGS) -o $@
 
 $(PROG).bin: $(PROG).elf
 	$(ESPUTIL) mkbin $? $@

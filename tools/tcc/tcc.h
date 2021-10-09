@@ -817,6 +817,7 @@ struct TCCState {
 
     unsigned char has_text_addr;
     addr_t text_addr; /* address of text section */
+    addr_t data_addr; /* address of data section */
     unsigned section_align; /* section alignment */
 #ifdef TCC_TARGET_I386
     int seg_size; /* 32. Can be 16 with i386 assembler (.code16) */
