@@ -562,7 +562,6 @@ static void flash(struct ctx *ctx, const char **args) {
       fflush(stdout);
 
       // Embed flash params into an image
-      // TODO(cpq): don't hardcode, detect them
       if (seq == 0) {
         if (flash_offset == ctx->chip.bla && flash_params != 0) {
           buf[hs + 2] = (uint8_t) ((flash_params >> 8) & 255);

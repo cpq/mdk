@@ -9,11 +9,12 @@ INCLUDES  ?= -I. -I$(MDK)/src -I$(MDK)/src/libc -I$(MDK)/tools/tcc/include -D$(A
 CFLAGS    ?= -W -Wall -Os -nostdinc $(INCLUDES) $(EXTRA_CFLAGS)
 LINKFLAGS ?= -nostdlib -static \
              -Wl,-image-base=0x40380400 \
-             -Wl,-data-base=0x3fc88000 \
-             -Wl,--defsym=memset=0x40000354 \
-             -Wl,--defsym=strlen=0x40000374 \
-             -Wl,--defsym=memcpy=0x40000358 \
-             -Wl,--defsym=memcmp=0x40000360
+             -Wl,-data-base=0x3fc88000
+
+#             -Wl,--defsym=memset=0x40000354
+#             -Wl,--defsym=strlen=0x40000374
+#             -Wl,--defsym=memcpy=0x40000358
+#             -Wl,--defsym=memcmp=0x40000360
 
 # boot.c must be first, to make _start be an entry point where .text begins
 SRCS  = $(MDK)/src/boot/boot.c
