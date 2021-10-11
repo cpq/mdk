@@ -1,17 +1,18 @@
 #include <sdk.h>
 
-static int led_pin = LED1;  // To override: make EXTRA_CFLAGS=-DLED1=5
-static int led_state = 0;
+#define LED_PIN 1
 
-int main(void) {
+int _start(void) {
   wdt_disable();
-  gpio_output(led_pin);
+  gpio_output(LED_PIN);
+  // gpio_write(LED_PIN, 1);
+  // for (;;) asm("nop");
 
   for (;;) {
-    gpio_write(led_pin, led_state);  // Blink an LED
-    sdk_log("%d\n", led_state);      // Print LED status
-    led_state ^= 1;                  // Toggle state
-    delay_ms(500);                   // Delay a bit
+    gpio_write(LED_PIN, 0);
+    delay_ms(250);
+    gpio_write(LED_PIN, 1);
+    delay_ms(250);
   }
 
   return 0;
