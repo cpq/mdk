@@ -152,7 +152,7 @@ static void usage(struct ctx *ctx) {
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
   printf("[-fspi FLASH_SPI] flash OFFSET BINFILE ...\n");
-  printf("  esputil mkbin FIRMWARE.ELF FIRMWARE.BIN\n");
+  printf("  esputil [-v] mkbin FIRMWARE.ELF FIRMWARE.BIN\n");
   printf("  esputil mkhex ADDRESS1 BINFILE1 ADDRESS2 BINFILE2 ...\n");
   printf("  esputil [-tmp TMP_DIR] unhex HEXFILE\n");
   exit(EXIT_FAILURE);
@@ -654,7 +654,7 @@ static struct Elf32_Phdr elf_get_phdr(const struct mem *elf, int no) {
   return h[no];
 }
 
-static int mkbin(const char *elf_path, const char *bin_path) {
+static int mkbin(const char *elf_path, const char *bin_path, bool verbose) {
   struct mem elf = read_entire_file(elf_path);
   FILE *bin_fp = fopen(bin_path, "w+b");
   uint8_t common_hdr[] = {0xe9, 0, 0, 0};
@@ -669,12 +669,14 @@ static int mkbin(const char *elf_path, const char *bin_path) {
   fwrite(common_hdr, 1, sizeof(common_hdr), bin_fp);      // Common header
   fwrite(&entrypoint, 1, sizeof(entrypoint), bin_fp);     // Entry point
   fwrite(extended_hdr, 1, sizeof(extended_hdr), bin_fp);  // Extended header
+  if (verbose) printf("%s: %d segments found\n", elf_path, (int) num_segments);
 
   // Iterate over segments
   for (i = 0; i < num_segments; i++) {
     struct Elf32_Phdr h = elf_get_phdr(&elf, i);
     uint32_t load_address = h.p_vaddr;
     uint32_t aligned_size = align_to(h.p_filesz, 4);
+    if (verbose) printf("  addr %x size %x\n", load_address, aligned_size);
     fwrite(&load_address, 1, sizeof(load_address), bin_fp);
     fwrite(&aligned_size, 1, sizeof(aligned_size), bin_fp);
     fwrite(elf.ptr + h.p_offset, 1, h.p_filesz, bin_fp);
@@ -860,7 +862,7 @@ int main(int argc, const char **argv) {
   // Commands that do not require serial port
   if (strcmp(*command, "mkbin") == 0) {
     if (!command[1] || !command[2]) usage(&ctx);
-    return mkbin(command[1], command[2]);
+    return mkbin(command[1], command[2], ctx.verbose);
   } else if (strcmp(*command, "mkhex") == 0) {
     return mkhex(&command[1]);
   } else if (strcmp(*command, "unhex") == 0) {
