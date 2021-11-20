@@ -16,7 +16,10 @@ for a full firmware rebuild and flash:
 
 # Environment setup
 
-Install a GCC RISCV compiler and export environment variables:
+Install a GCC RISCV compiler from
+https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads
+
+and export environment variables:
 - Using Docker on Linux or Mac. Slower builds, but works off-the-shelf:
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
@@ -30,7 +33,6 @@ Install a GCC RISCV compiler and export environment variables:
   $ export MDK=/path/to/mdk                 # Points to MDK directory
   $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
   $ export TOOLCHAIN=riscv64-unknown-elf    # $TOOLCHAIN-gcc must run GCC
-  $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/cu.usb*                # Serial port for flashing
   ```
 - Native Linux: install GCC, e.g. from https://github.com/espressif/crosstool-NG, then
@@ -38,7 +40,6 @@ Install a GCC RISCV compiler and export environment variables:
   $ export MDK=/path/to/mdk                 # Points to MDK directory
   $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
   $ export TOOLCHAIN=riscv32-esp-elf        # $TOOLCHAIN-gcc must run GCC
-  $ export ARCH=ESP32C3                     # Choices: ESP32C3, ESP32
   $ export PORT=/dev/ttyUSB0                # Serial port for flashing
   ```
 
