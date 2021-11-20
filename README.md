@@ -68,7 +68,8 @@ Environment / Makefile variables:
 | ARCH | Architecture. Possible values: ESP32C3, ESP32. Default: ESP32C3 |
 | TOOLCHAIN | GCC binary prefix. Default: riscv64-unknown-elf |
 | PORT | Serial port. Default: /dev/ttyUSB0 |
-| FPARAMS | Flash parameters, see below. Default: 0x21f |
+| FLASH\_PARAMS | Flash parameters, see below. Default: empty |
+| FLASH\_SPI | Flash SPI settings, see below. Default: empty |
 | EXTRA\_CFLAGS | Extra compiler flags. Default: empty |
 | EXTRA\_LINKFLAGS | Extra linker flags. Default: empty |
 
