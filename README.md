@@ -61,35 +61,23 @@ include $(MDK)/make/build.mk
 
 # Environment reference
 
-Environment / Makefile variables:
-
-| Name | Description |
-| ---- | ----------- |
-| ARCH | Architecture. Possible values: ESP32C3, ESP32. Default: ESP32C3 |
-| TOOLCHAIN | GCC binary prefix. Default: riscv64-unknown-elf |
-| PORT | Serial port. Default: /dev/ttyUSB0 |
-| FLASH\_PARAMS | Flash parameters, see below. Default: empty |
-| FLASH\_SPI | Flash SPI settings, see below. Default: empty |
-| EXTRA\_CFLAGS | Extra compiler flags. Default: empty |
-| EXTRA\_LINKFLAGS | Extra linker flags. Default: empty |
-
-Makefile targets:
-
-| Name | Description | 
-| ---- | ----------- |
-| clean | Clean up build artifacts |
-| build | Build firmware in a project's `build/` directory |
-| flash | Flash firmware. Needs PORT variable set |
-| monitor | Run serial monitor. Needs PORT variable set |
-| unix | Build Mac/Linux executable firmware, see "UNIX mode" section below |
-
-
-Preprocessor definitions
-
-| Name | Description | 
-| ---- | ----------- |
-| LED1 | User LED pin. Default: 2 |
-| BTN1 | User button pin. Default: 9 |
+- **Environment / Makefile variables:**
+  - `ARCH` - Architecture. Possible values: ESP32C3, ESP32. Default: ESP32C3
+  - `TOOLCHAIN` - GCC binary prefix. Default: riscv64-unknown-elf
+  - `PORT` - Serial port for flashing. Default: /dev/ttyUSB0
+  - `FLASH_PARAMS` - Flash parameters, see below. Default: empty
+  - `FLASH_SPI` - Flash SPI settings, see below. Default: empty
+  - `EXTRA_CFLAGS` - Extra compiler flags. Default: empty
+  - `EXTRA_LINKFLAGS` - Extra linker flags. Default: empty
+- **Makefile targets:**
+  - `make clean` - Clean up build artifacts
+  - `make build` - Build firmware in a project's `build/` directory
+  - `make flash` - Flash firmware. Needs PORT variable set
+  - `make monitor` - Run serial monitor. Needs PORT variable set
+  - `make unix` - Build Mac/Linux executable firmware, see "UNIX mode" section below
+- **SDK Preprocessor definitions:**
+  - `LED1` - User LED pin. Default: 2
+  - `BTN1` - User button pin. Default: 9
 
 
 # API reference
