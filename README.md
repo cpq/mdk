@@ -16,10 +16,6 @@ for a full firmware rebuild and flash:
 
 # Environment setup
 
-Install a GCC RISCV compiler from
-https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads
-
-and export environment variables:
 - Using Docker on Linux or Mac. Slower builds, but works off-the-shelf:
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
