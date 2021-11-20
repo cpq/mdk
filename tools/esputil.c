@@ -152,7 +152,7 @@ static void usage(struct ctx *ctx) {
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
   printf("[-fspi FLASH_SPI] flash OFFSET BINFILE ...\n");
-  printf("  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...\n");
+  printf("  esputil [-v] mkbin FIRMWARE.ELF FIRMWARE.BIN\n");
   printf("  esputil mkhex ADDRESS1 BINFILE1 ADDRESS2 BINFILE2 ...\n");
   printf("  esputil [-tmp TMP_DIR] unhex HEXFILE\n");
   exit(EXIT_FAILURE);
@@ -449,7 +449,7 @@ static void monitor(struct ctx *ctx) {
     int n = read(ctx->fd, buf, sizeof(buf));   // Read from a device
     if (n <= 0) fail("Serial line closed\n");  // If serial is closed, exit
 
-    if (ctx->verbose) dump("R", buf, n);
+    if (n > 0 && ctx->verbose) dump("READ", buf, n);
     for (i = 0; i < n; i++) {
       size_t len = slip_recv(buf[i], &ctx->slip);            // Pass to SLIP
       if (len == 0 && ctx->slip.mode == 0) putchar(buf[i]);  // In serial mode
@@ -461,6 +461,7 @@ static void monitor(struct ctx *ctx) {
   if (ready & 1) {  // Forward stdin to a device
     uint8_t buf[BUFSIZ];
     int n = read(0, buf, sizeof(buf));
+    if (n > 0 && ctx->verbose) dump("WRITE", buf, n);
     for (i = 0; i < n; i++) uart_tx(buf[i], &ctx->fd);
   }
 }
@@ -523,7 +524,7 @@ static void flash(struct ctx *ctx, const char **args) {
   while (args[0] && args[1]) {
     FILE *fp = fopen(args[1], "rb");
     int i, n, size, seq = 0;
-    uint32_t block_size = 4096, hs = 16, encrypted = 0, cs;
+    uint32_t block_size = 4096, hs = 16, encrypted = 0, cs, tmp;
     uint32_t flash_offset = strtoul(args[0], NULL, 0);
     uint8_t buf[16 + 4096];  // First 16 bytes are for serial cmd
 
@@ -561,7 +562,6 @@ static void flash(struct ctx *ctx, const char **args) {
       fflush(stdout);
 
       // Embed flash params into an image
-      // TODO(cpq): don't hardcode, detect them
       if (seq == 0) {
         if (flash_offset == ctx->chip.bla && flash_params != 0) {
           buf[hs + 2] = (uint8_t) ((flash_params >> 8) & 255);
@@ -578,8 +578,8 @@ static void flash(struct ctx *ctx, const char **args) {
       // n = ALIGN(n, block_size);
 
       // Flash write
-      *(uint32_t *) &buf[0] = n;      // Populate initial bytes - size
-      *(uint32_t *) &buf[4] = seq++;  // And sequence numner
+      tmp = n, memcpy(&buf[0], &tmp, 4);      // Set buffer size
+      tmp = seq++, memcpy(&buf[4], &tmp, 4);  // Set sequence number
       cs = checksum(buf + hs, n);
       if (cmd(ctx, 3, buf, (uint16_t) (hs + n), cs, 1500))
         fail("flash_data failed\n");
@@ -604,47 +604,85 @@ static unsigned long align_to(unsigned long n, unsigned to) {
   return ((n + to - 1) / to) * to;
 }
 
-static int mkbin(const char *bin_path, const char *ep, const char *args[]) {
+////////////////////////////////// mkbin command - ELF related functionality
+
+struct mem {
+  unsigned char *ptr;
+  int len;
+};
+
+struct Elf32_Ehdr {
+  unsigned char e_ident[16];
+  uint16_t e_type, e_machine;
+  uint32_t e_version, e_entry, e_phoff, e_shoff, e_flags;
+  uint16_t e_ehsize, e_phentsize, e_phnum, e_shentsize, e_shnum, e_shstrndx;
+};
+
+struct Elf32_Phdr {
+  uint32_t p_type, p_offset, p_vaddr, p_paddr;
+  uint32_t p_filesz, p_memsz, p_flags, p_align;
+};
+
+static struct mem read_entire_file(const char *path) {
+  struct mem mem;
+  FILE *fp = fopen(path, "rb");
+  if (fp == NULL) fail("Cannot open %s: %s\n", path, strerror(errno));
+  fseek(fp, 0, SEEK_END);
+  mem.len = ftell(fp);
+  rewind(fp);
+  mem.ptr = malloc(mem.len);
+  if (mem.ptr == NULL) fail("malloc(%d) failed\n", mem.len);
+  if (fread(mem.ptr, 1, mem.len, fp) != (size_t) mem.len) {
+    fail("fread(%s) failed: %s\n", path, strerror(errno));
+  }
+  fclose(fp);
+  return mem;
+}
+
+static int elf_get_num_segments(const struct mem *elf) {
+  struct Elf32_Ehdr *e = (struct Elf32_Ehdr *) elf->ptr;
+  return e->e_phnum;
+}
+
+static uint32_t elf_get_entry_point(const struct mem *elf) {
+  return ((struct Elf32_Ehdr *) elf->ptr)->e_entry;
+}
+
+static struct Elf32_Phdr elf_get_phdr(const struct mem *elf, int no) {
+  struct Elf32_Ehdr *e = (struct Elf32_Ehdr *) elf->ptr;
+  struct Elf32_Phdr *h = (struct Elf32_Phdr *) (elf->ptr + e->e_phoff);
+  if (h->p_filesz == 0) no++;  // GCC-generated phdrs have empty 1st phdr
+  return h[no];
+}
+
+static int mkbin(const char *elf_path, const char *bin_path, bool verbose) {
+  struct mem elf = read_entire_file(elf_path);
   FILE *bin_fp = fopen(bin_path, "w+b");
   uint8_t common_hdr[] = {0xe9, 0, 0, 0};
   uint8_t extended_hdr[] = {0xee, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-  uint8_t i, j, cs = 0xef, zero = 0;
-  uint32_t entrypoint = strtoul(ep, NULL, 16);
-  uint8_t num_segments = 0;
+  uint8_t i, j, cs = 0xef, zero = 0, num_segments = elf_get_num_segments(&elf);
+  uint32_t entrypoint = elf_get_entry_point(&elf);
 
+  // GCC generates 2 segments. TCC - 4, first two are .text and .data
+  num_segments = 2;
   if (bin_fp == NULL) fail("Cannot open %s: %s\n", bin_path, strerror(errno));
-
-  while (args[num_segments * 2] && args[num_segments * 2 + 1]) num_segments++;
-
   common_hdr[1] = num_segments;
   fwrite(common_hdr, 1, sizeof(common_hdr), bin_fp);      // Common header
   fwrite(&entrypoint, 1, sizeof(entrypoint), bin_fp);     // Entry point
   fwrite(extended_hdr, 1, sizeof(extended_hdr), bin_fp);  // Extended header
+  if (verbose) printf("%s: %d segments found\n", elf_path, (int) num_segments);
 
   // Iterate over segments
   for (i = 0; i < num_segments; i++) {
-    uint32_t load_address = strtoul(args[i * 2], NULL, 16);
-    FILE *fp = fopen(args[i * 2 + 1], "rb");
-    uint32_t size, aligned_size;
-    uint8_t buf[BUFSIZ];
-    int n;
-
-    if (fp == NULL)
-      fail("Cannot open %s: %s\n", args[i * 2 + 1], strerror(errno));
-    fseek(fp, 0, SEEK_END);
-    size = ftell(fp);
-    rewind(fp);
-    aligned_size = align_to(size, 4);
-
+    struct Elf32_Phdr h = elf_get_phdr(&elf, i);
+    uint32_t load_address = h.p_vaddr;
+    uint32_t aligned_size = align_to(h.p_filesz, 4);
+    if (verbose) printf("  addr %x size %x\n", load_address, aligned_size);
     fwrite(&load_address, 1, sizeof(load_address), bin_fp);
     fwrite(&aligned_size, 1, sizeof(aligned_size), bin_fp);
-
-    while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
-      cs = checksum2(cs, buf, n);
-      fwrite(buf, 1, n, bin_fp);
-    }
-    fclose(fp);
-    for (j = 0; j < aligned_size - size; j++) fputc(zero, bin_fp);
+    fwrite(elf.ptr + h.p_offset, 1, h.p_filesz, bin_fp);
+    for (j = 0; j < aligned_size - h.p_filesz; j++) fputc(zero, bin_fp);
+    cs = checksum2(cs, elf.ptr + h.p_offset, h.p_filesz);
   }
 
   {
@@ -655,8 +693,10 @@ static int mkbin(const char *bin_path, const char *ep, const char *args[]) {
   }
 
   fclose(bin_fp);
+  free(elf.ptr);
   return EXIT_SUCCESS;
 }
+///////////////////////////////////////////////// End of mkbin command
 
 static void printhexline(int type, int len, int addr, int *buf) {
   unsigned i, cs = type + len + ((addr >> 8) & 255) + (addr & 255);
@@ -822,8 +862,8 @@ int main(int argc, const char **argv) {
 
   // Commands that do not require serial port
   if (strcmp(*command, "mkbin") == 0) {
-    if (!command[1] || !command[2] || !command[3] || !command[4]) usage(&ctx);
-    return mkbin(command[1], command[2], &command[3]);
+    if (!command[1] || !command[2]) usage(&ctx);
+    return mkbin(command[1], command[2], ctx.verbose);
   } else if (strcmp(*command, "mkhex") == 0) {
     return mkhex(&command[1]);
   } else if (strcmp(*command, "unhex") == 0) {

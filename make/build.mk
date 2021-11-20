@@ -62,17 +62,9 @@ $(OBJ_PATH)/$(PROG).elf: $(OBJECTS)
 	$(TOOLCHAIN)-gcc -Xlinker $(OBJECTS) $(LINKFLAGS) -o $@
 	$(TOOLCHAIN)-size $@
 
-# elf_section_load_address FILE,SECTION_NAME
-elf_section_load_address = $(shell $(TOOLCHAIN)-objdump -h $1 | grep -F $2 | tr -s ' ' | cut -d ' ' -f 5)
-
-# elf_symbol_address FILE,SYMBOL
-elf_entry_point_address = $(shell $(TOOLCHAIN)-nm $1 | grep 'T $2' | cut -f1 -dT)
-
 $(OBJ_PATH)/$(PROG).bin: $(ESPUTIL)
 $(OBJ_PATH)/$(PROG).bin: $(OBJ_PATH)/$(PROG).elf
-	$(TOOLCHAIN)-objcopy -O binary --only-section .text $< $(OBJ_PATH)/.text.bin
-	$(TOOLCHAIN)-objcopy -O binary --only-section .data $< $(OBJ_PATH)/.data.bin
-	$(ESPUTIL) mkbin $@ $(call elf_entry_point_address,$<,_reset) $(call elf_section_load_address,$<,.data) $(OBJ_PATH)/.data.bin $(call elf_section_load_address,$<,.text) $(OBJ_PATH)/.text.bin
+	$(ESPUTIL) mkbin $(OBJ_PATH)/$(PROG).elf $@
 
 flash: $(OBJ_PATH)/$(PROG).bin $(ESPUTIL)
 	$(ESPUTIL) flash $(BLOFFSET) $(OBJ_PATH)/$(PROG).bin
