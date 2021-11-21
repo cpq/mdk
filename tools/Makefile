@@ -35,4 +35,4 @@ examples-clean:
 	for d in ../examples/*; do make -C $$d clean ; done
 
 clean: examples-clean
-	rm -rf slipterm esputil *.dSYM *.o *.exe *.obj _CL*
+	rm -rf slipterm esputil *.dSYM *.o *.obj _CL*
