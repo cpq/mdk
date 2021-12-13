@@ -238,7 +238,7 @@ cl tools\esputil.c
 Flashing ESP32 chips is done via UART. In order to do so, ESP32 should be
 rebooted in the flashing mode, by pulling IO0 low during boot. Then, a ROM
 bootloader uses SLIP framing for a simple serial protocol, which is
-described at https://github.com/espressif/esptool/wiki/Serial-Protocol.
+described at https://docs.espressif.com/projects/esptool/en/latest/advanced-topics/serial-protocol.html.
 
 Using that SLIP protocol, it is possible to write images to flash at
 any offset. That is what [tools/esputil.c](tools/esputil.c) implements.
