@@ -1,8 +1,8 @@
 MDK      ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 PROG     ?= firmware
 ARCH     ?= ESP32C3
-COMPILER ?= riscv32-tcc
-ESPUTIL  ?= esputil
+COMPILER ?= $(MDK)/tools/riscv32-tcc
+ESPUTIL  ?= $(MDK)/tools/esputil
 BLOFFSET ?= 0
 
 INCLUDES  ?= -I. -I$(MDK)/src -I$(MDK)/src/libc -I$(MDK)/tools/tcc/include -D$(ARCH) -nostdinc
@@ -28,17 +28,23 @@ unix: SRCS = $(filter-out %.s,$(filter-out $(MDK)/src/malloc.c,$(SRCS)))
 unix: $(SRCS)
 	$(CC) $(CFLAGS) $(SRCS) -o firmware
 
-$(PROG).elf: $(SRCS) $(HDRS)
+$(PROG).elf: $(COMPILER) $(SRCS) $(HDRS)
 	$(COMPILER) $(SRCS) $(CFLAGS) $(LINKFLAGS) -o $@
 
-$(PROG).bin: $(PROG).elf
-	$(ESPUTIL) mkbin $? $@
+$(PROG).bin: $(ESPUTIL) $(PROG).elf
+	$(ESPUTIL) mkbin $(PROG).elf $@
 
-flash: $(PROG).bin
-	$(ESPUTIL) flash $(BLOFFSET) $?
+flash: $(ESPUTIL) $(PROG).bin
+	$(ESPUTIL) flash $(BLOFFSET) $(PROG).bin
 
-monitor:
+monitor: $(ESPUTIL)
 	$(ESPUTIL) monitor
+
+$(ESPUTIL):
+	$(MAKE) -C $(MDK)/tools esputil
+
+$(COMPILER):
+	$(MAKE) -C $(MDK)/tools tcc
 
 clean:
 	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(PROG) $(PROG).*

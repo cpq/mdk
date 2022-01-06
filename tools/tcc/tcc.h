@@ -1625,6 +1625,7 @@ static inline uint32_t read32le(unsigned char *p) {
   return read16le(p) | (uint32_t)read16le(p + 2) << 16;
 }
 static inline void write32le(unsigned char *p, uint32_t x) {
+    // printf("%#010x: %#010x\n", ind, x); 
     write16le(p, x);  write16le(p + 2, x >> 16);
 }
 static inline void add32le(unsigned char *p, int32_t x) {

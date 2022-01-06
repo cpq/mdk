@@ -49,7 +49,8 @@
   DEF(TOK_ASM_ ## x ## _ ## y, #x #y)
 
 /*   Loads */
-
+ DEF_ASM(la)
+ DEF_ASM(li)
  DEF_ASM(lb)
  DEF_ASM(lh)
  DEF_ASM(lw)
@@ -97,14 +98,18 @@
  DEF_ASM(sltiu)
 
 /* Branch */
-
  DEF_ASM(beq)
  DEF_ASM(bne)
  DEF_ASM(blt)
  DEF_ASM(bge)
  DEF_ASM(bltu)
  DEF_ASM(bgeu)
+
+/* Jump and Link */
  DEF_ASM(j)
+ DEF_ASM(jal)
+ DEF_ASM(jalr)
+ DEF_ASM(jr)
 
 /* Sync */
 
@@ -125,13 +130,37 @@
  DEF_ASM(rdinstret)
  DEF_ASM(rdinstreth)
 
+ /* control and status */
+ DEF_ASM(csrrw)
+ DEF_ASM(csrrs)
+ DEF_ASM(csrrc)
+ DEF_ASM(csrrwi)
+ DEF_ASM(csrrsi)
+ DEF_ASM(csrrci)
+
+ /* control and status pseudoinstructions */
+ DEF_ASM(csrr)
+ DEF_ASM(csrw)
+ DEF_ASM(csrs)
+ DEF_ASM(csrc)
+ DEF_ASM(csrwi)
+ DEF_ASM(csrsi)
+ DEF_ASM(csrci)
+
 /* Privileged Instructions */
 
  DEF_ASM(ecall)
  DEF_ASM(ebreak)
-
  DEF_ASM(mrts)
  DEF_ASM(mrth)
  DEF_ASM(hrts)
  DEF_ASM(wfi)
 
+ /* Multiply/Divide */
+ DEF_ASM(mul)
+ DEF_ASM(mulh)
+ DEF_ASM(mulhsu)
+ DEF_ASM(div)
+ DEF_ASM(divu)
+ DEF_ASM(rem)
+ DEF_ASM(remu)
