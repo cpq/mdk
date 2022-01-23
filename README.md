@@ -16,27 +16,11 @@ for a full firmware rebuild and flash:
 
 # Environment setup
 
-- Using Docker on Linux or Mac. Slower builds, but works off-the-shelf:
+1. Use Linux or MacOS. Install [Docker](https://docker.com)
+2. Execute the following shell commands (or add this to your `~/.profile`):
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
-  $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
   $ export PORT=/dev/cu.usb*                # Serial port for flashing
-  ```
-- Native MacOS (installation takes time):
-  ```sh
-  $ brew tap riscv/riscv
-  $ brew install riscv-gnu-toolchain --with-multilib
-  $ export MDK=/path/to/mdk                 # Points to MDK directory
-  $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
-  $ export TOOLCHAIN=riscv64-unknown-elf    # $TOOLCHAIN-gcc must run GCC
-  $ export PORT=/dev/cu.usb*                # Serial port for flashing
-  ```
-- Native Linux: install GCC, e.g. from https://github.com/espressif/crosstool-NG, then
-  ```sh
-  $ export MDK=/path/to/mdk                 # Points to MDK directory
-  $ export PATH=$PATH:$MDK/tools            # Add $MDK/tools to $PATH
-  $ export TOOLCHAIN=riscv32-esp-elf        # $TOOLCHAIN-gcc must run GCC
-  $ export PORT=/dev/ttyUSB0                # Serial port for flashing
   ```
 
 Verify setup by building and flashing a blinky example firmware.
