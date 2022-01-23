@@ -134,7 +134,9 @@ API support matrix:
 
 `esputil` is a command line tool for managing Espressif devices. It is a
 replacement of `esptool.py`. `esputil` is written in C, its source code
-is in [tools/esputil.c](tools/esputil.c). Below is a quick reference:
+is in [tools/esputil.c](tools/esputil.c). It works on Linux, UNIX and Windows.
+A pre-compiled Windows executable can be downloaded from
+https://github.com/cpq/mdk/releases/latest. Below is a quick reference:
 
 ```sh
 $ esputil -h
