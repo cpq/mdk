@@ -17,7 +17,7 @@ for a full firmware rebuild and flash:
 # Environment setup
 
 1. Use Linux or MacOS. Install [Docker](https://docker.com)
-2. Execute the following shell commands (or add this to your `~/.profile`):
+2. Execute the following shell commands (or add them to your `~/.profile`):
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
   $ export PORT=/dev/cu.usb*                # Serial port for flashing
