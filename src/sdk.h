@@ -11,17 +11,37 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define BIT(x) ((uint32_t) 1 << (x))
+#define REG(x) ((volatile uint32_t *) (x))
+
+int sdk_ram_used(void);
+int sdk_ram_free(void);
+
+static inline void spin(volatile unsigned long count) {
+  while (count--) asm volatile("nop");
+}
+
+// Linked list management macros
+#define LIST_ADD(head_, elem_) \
+  do {                         \
+    (elem_)->next = (*head_);  \
+    *(head_) = (elem_);        \
+  } while (0)
+
+#define LIST_DEL(type_, head_, elem_)      \
+  do {                                     \
+    type_ **h = head_;                     \
+    while (*h != (elem_)) h = &(*h)->next; \
+    *h = (elem_)->next;                    \
+  } while (0)
+
 #include "gpio.h"
-#include "ledc.h"
 #include "log.h"
 #include "soc.h"
 #include "spi.h"
-#include "sys.h"
 #include "tcpip.h"
 #include "timer.h"
 #include "uart.h"
-#include "wdt.h"
-#include "wifi.h"
 #include "ws2812.h"
 
 #ifndef LED1

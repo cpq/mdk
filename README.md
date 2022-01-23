@@ -62,7 +62,7 @@ include $(MDK)/make/build.mk
 # Environment reference
 
 - **Environment / Makefile variables:**
-  - `ARCH` - Architecture. Possible values: ESP32C3, ESP32. Default: ESP32C3
+  - `ARCH` - Architecture. Possible values: esp32c3, esp32. Default: esp32c3
   - `TOOLCHAIN` - GCC binary prefix. Default: riscv64-unknown-elf
   - `PORT` - Serial port for flashing. Default: /dev/ttyUSB0
   - `FLASH_PARAMS` - Flash parameters, see below. Default: empty

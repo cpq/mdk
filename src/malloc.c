@@ -31,6 +31,8 @@
 
 #include <sdk.h>
 
+#if defined(__unix) || defined(__unix__) || defined(__APPLE__)
+#else
 struct block {
   size_t size;
   struct block *next;
@@ -42,7 +44,6 @@ extern void *sbrk(int);
 void *malloc(size_t size) {
   const size_t align_to = 16;
   size = (size + sizeof(size_t) + (align_to - 1)) & ~(align_to - 1);
-
 
   struct block **h = &s_free;
   while (*h != NULL && (*h)->size < size) h = &(*h)->next;
@@ -79,3 +80,4 @@ void *realloc(void *ptr, size_t size) {
   free(ptr);
   return p;
 }
+#endif
