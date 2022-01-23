@@ -46,7 +46,7 @@ include $(MDK)/make/build.mk
 # Environment reference
 
 - **Environment / Makefile variables:**
-  - `ARCH` - Architecture. Possible values: esp32c3, esp32. Default: esp32c3
+  - `ARCH` - Architecture. Possible values: esp32c3, esp32, posix. Default: esp32c3
   - `TOOLCHAIN` - GCC binary prefix. Default: riscv64-unknown-elf
   - `PORT` - Serial port for flashing. Default: /dev/ttyUSB0
   - `FLASH_PARAMS` - Flash parameters, see below. Default: empty
@@ -73,7 +73,7 @@ API support matrix:
 | ESP32C3 | yes  | yes |  -  |  yes |  -   |  yes  |  yes   | -    |
 | ESP32   | yes  | yes |  -  |  -   |  -   |  yes  |  yes   | -    |
 
-- GPIO [src/gpio.h](src/gpio.h)
+- GPIO [src/ARCH/gpio.h](src/esp32c3/gpio.h)
   ```c
   void gpio_output(int pin);              // Set pin mode to OUTPUT
   void gpio_input(int pin);               // Set pin mode to INPUT
@@ -91,16 +91,21 @@ API support matrix:
   void spi_end(struct spi *spi, int cs);    // End SPI transaction
   unsigned char spi_txn(struct spi *spi, unsigned char);   // Do SPI transaction
   ```
-- UART [src/uart.h](src/uart.h), [src/uart.c](src/uart.c)
+- UART [src/uart.h](src/uart.h), [src/ARCH/uart.c](src/esp32c3/uart.c)
   ```c
   void uart_init(int no, int tx, int rx, int baud);   // Initialise UART
   bool uart_read(int no, uint8_t *c);   // Read byte. Return true on success
   void uart_write(int no, uint8_t c);   // Write byte. Block if FIFO is full
   ```
-- LEDC
-- WDT [src/wdt.h](src/wdt.h)
+- SOC [src/ARCH/soc.h](src/esp32c3/soc.h)
   ```c
   void wdt_disable(void);   // Disable watchdog
+  int sdk_ram_used(void);           // Return used RAM in bytes
+  int sdk_ram_free(void);           // Return free RAM in bytes
+  unsigned long time_us(void);      // Return uptime in microseconds
+  void delay_us(unsigned long us);  // Block for "us" microseconds
+  void delay_ms(unsigned long ms);  // Block for "ms" milliseconds
+  void spin(unsigned long count);   // Execute "count" no-op instructions
   ```
 - Timer [src/timer.h](src/timer.h)
   ```c
@@ -115,15 +120,6 @@ API support matrix:
   #define TIMER_ADD(head_, p_, fn_, arg_)
   void timers_poll(struct timer *head, uint64_t now);
   ```
-- System  [src/sys.h](src/sys.h)
-  ```c
-  int sdk_ram_used(void);           // Return used RAM in bytes
-  int sdk_ram_free(void);           // Return free RAM in bytes
-  unsigned long time_us(void);      // Return uptime in microseconds
-  void delay_us(unsigned long us);  // Block for "us" microseconds
-  void delay_ms(unsigned long ms);  // Block for "ms" milliseconds
-  void spin(unsigned long count);   // Execute "count" no-op instructions
-  ```
 - Log [src/log.h](src/log.h), [src/log.c](src/log.c)
   ```c
   void sdk_log(const char *fmt, ...);   // Log message to UART 0
@@ -133,29 +129,6 @@ API support matrix:
   ```
 - TCP/IP
 
-
-# UNIX mode
-
-Firmware examples could be built on Mac/Linux as normal UNIX binaries.
-In the firmware directory, type
-
-```sh
-make unix
-```
-
-That builds a `build/firmware` executable.
-To support that, all hardware API are mocked out. The typical API
-implementation looks like:
-
-```c
-#if defined(ESP32C3)
-...
-#elif defined(ESP32)
-...
-#elif defined(__unix) || defined(__unix__) || defined(__APPLE__)
-...  <-- Here goes a mocked-out hardware API implementation
-#endif
-```
 
 # esputil
 
