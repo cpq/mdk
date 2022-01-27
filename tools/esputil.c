@@ -150,6 +150,8 @@ static void usage(struct ctx *ctx) {
   printf("Usage:\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
+  printf("  esputil [-v] [-b BAUD] [-p PORT] readmem ADDR SIZE\n");
+  printf("  esputil [-v] [-b BAUD] [-p PORT] readflash ADDR SIZE\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
   printf("[-fspi FLASH_SPI] flash OFFSET BINFILE ...\n");
   printf("  esputil [-v] mkbin FIRMWARE.ELF FIRMWARE.BIN\n");
@@ -480,6 +482,65 @@ static void info(struct ctx *ctx) {
   }
 }
 
+static void readmem(struct ctx *ctx, const char **args) {
+  if (!chip_connect(ctx)) {
+    fail("Error connecting\n");
+  } else if (args[0] == NULL || args[1] == NULL) {
+    usage(ctx);
+  } else {
+    uint32_t i, value, base = strtoul(args[0], NULL, 0),
+                       size = strtoul(args[1], NULL, 0);
+    for (i = 0; i < size; i += 4) {
+      if (read32(ctx, base + i, &value) == 0) {
+        fwrite(&value, 1, sizeof(value), stdout);
+      } else {
+        fprintf(stderr, "Error: mem read @ addr %#x\n", base + i);
+        break;
+      }
+    }
+  }
+}
+
+static void spiattach(struct ctx *ctx) {
+  uint32_t d3[] = {0, 0};
+  uint32_t d4[] = {0, 4 * 1024 * 1024, 65536, 4096, 256, 0xffff};
+  if (ctx->fspi != NULL) {
+    // 6,17,8,11,16 -> 0xb408446, like esptool does
+    unsigned a = 0, b = 0, c = 0, d = 0, e = 0;
+    sscanf(ctx->fspi, "%u,%u,%u,%u,%u", &a, &b, &c, &e, &d);
+    d3[0] = a | (b << 6) | (c << 12) | (d << 18) | (e << 24);
+    // printf("-----> %u,%u,%u,%u,%u -> %x\n", a, b, c, d, e, pins);
+  }
+  if (cmd(ctx, 13, d3, sizeof(d3), 0, 250)) fail("SPI_ATTACH failed\n");
+  // flash_id, flash size, block_size, sector_size, page_size, status_mask
+  if (cmd(ctx, 11, d4, sizeof(d4), 0, 250)) fail("SPI_SET_PARAMS failed\n");
+}
+
+static void readflash(struct ctx *ctx, const char **args) {
+  if (!chip_connect(ctx)) {
+    fail("Error connecting\n");
+  } else if (args[0] == NULL || args[1] == NULL) {
+    usage(ctx);
+  } else if (ctx->chip.id == CHIP_ID_ESP8266) {
+    fail("Can't do it on esp8266\n");
+  } else {
+    uint32_t i = 0, base = strtoul(args[0], NULL, 0),
+             size = strtoul(args[1], NULL, 0);
+    spiattach(ctx);
+    while (i < size) {
+      uint32_t bs = size - i > 64 ? 64 : size - i;
+      uint32_t d[] = {base + i, bs};
+      if (cmd(ctx, 14, d, sizeof(d), 0, 500) != 0) {
+        printf("Error: flash read @ addr %#x\n", base + i);
+        break;
+      } else {
+        fwrite(&ctx->slip.buf[8], 1, bs, stdout);
+        i += bs;
+      }
+    }
+  }
+}
+
 static void flash(struct ctx *ctx, const char **args) {
   uint16_t flash_params = 0;
   if (!chip_connect(ctx)) fail("Error connecting\n");
@@ -492,18 +553,7 @@ static void flash(struct ctx *ctx, const char **args) {
 
   // For non-ESP8266, SPI attach is mandatory
   if (ctx->chip.id != CHIP_ID_ESP8266) {
-    uint32_t d3[] = {0, 0};
-    uint32_t d4[] = {0, 4 * 1024 * 1024, 65536, 4096, 256, 0xffff};
-    if (ctx->fspi != NULL) {
-      // 6,17,8,11,16 -> 0xb408446, like esptool does
-      unsigned a = 0, b = 0, c = 0, d = 0, e = 0;
-      sscanf(ctx->fspi, "%u,%u,%u,%u,%u", &a, &b, &c, &e, &d);
-      d3[0] = a | (b << 6) | (c << 12) | (d << 18) | (e << 24);
-      // printf("-----> %u,%u,%u,%u,%u -> %x\n", a, b, c, d, e, pins);
-    }
-    if (cmd(ctx, 13, d3, sizeof(d3), 0, 250)) fail("SPI_ATTACH failed\n");
-    // flash_id, flash size, block_size, sector_size, page_size, status_mask
-    if (cmd(ctx, 11, d4, sizeof(d4), 0, 250)) fail("SPI_SET_PARAMS failed\n");
+    spiattach(ctx);
 
     // Load first word from the bootloader - flash params are encoded there,
     // in the last 2 bytes, see README.md in the repo root
@@ -883,6 +933,10 @@ int main(int argc, const char **argv) {
     info(&ctx);
   } else if (strcmp(*command, "flash") == 0) {
     flash(&ctx, &command[1]);
+  } else if (strcmp(*command, "readmem") == 0) {
+    readmem(&ctx, &command[1]);
+  } else if (strcmp(*command, "readflash") == 0) {
+    readflash(&ctx, &command[1]);
   } else if (strcmp(*command, "monitor") == 0) {
     while (s_signo == 0) monitor(&ctx);
   } else {

@@ -136,7 +136,7 @@ API support matrix:
 replacement of `esptool.py`. `esputil` is written in C, its source code
 is in [tools/esputil.c](tools/esputil.c). It works on Linux, UNIX and Windows.
 A pre-compiled Windows executable can be downloaded from
-https://github.com/cpq/mdk/releases/latest. Below is a quick reference:
+the [tools](tools) folder. Below is a quick reference:
 
 ```sh
 $ esputil -h
@@ -144,8 +144,10 @@ Defaults: BAUD=115200, PORT=/dev/ttyUSB0
 Usage:
   esputil [-v] [-b BAUD] [-p PORT] monitor
   esputil [-v] [-b BAUD] [-p PORT] info
+  esputil [-v] [-b BAUD] [-p PORT] readmem ADDR SIZE
+  esputil [-v] [-b BAUD] [-p PORT] readflash ADDR SIZE
   esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] [-fspi FLASH_SPI] flash OFFSET BINFILE ...
-  esputil mkbin OUTPUT.BIN ENTRYADDR SECTION_ADDR SECTION.BIN ...
+  esputil [-v] mkbin FIRMWARE.ELF FIRMWARE.BIN
   esputil mkhex ADDRESS1 BINFILE1 ADDRESS2 BINFILE2 ...
   esputil [-tmp TMP_DIR] unhex HEXFILE
 ```
