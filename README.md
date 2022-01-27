@@ -20,7 +20,7 @@ for a full firmware rebuild and flash:
 2. Execute the following shell commands (or add them to your `~/.profile`):
   ```sh
   $ export MDK=/path/to/mdk                 # Points to MDK directory
-  $ export PORT=/dev/cu.usb*                # Serial port for flashing
+  $ export PORT=/dev/ttyUSB0                # Serial port for flashing
   ```
 
 Verify setup by building and flashing a blinky example firmware.
