@@ -668,7 +668,7 @@ static int mkbin(const char *elf_path, const char *bin_path, bool verbose) {
   if (elf.ptr[4] != '\x01') fail("Not ELF32: %d\n", elf.ptr[4]);
 
   // GCC generates 2 segments. TCC - 4, first two are .text and .data
-  num_segments = 2;
+  // num_segments = 2;
   common_hdr[1] = num_segments;
   fwrite(common_hdr, 1, sizeof(common_hdr), bin_fp);      // Common header
   fwrite(&entrypoint, 1, sizeof(entrypoint), bin_fp);     // Entry point
@@ -680,7 +680,7 @@ static int mkbin(const char *elf_path, const char *bin_path, bool verbose) {
     struct Elf32_Phdr h = elf_get_phdr(&elf, i);
     uint32_t load_address = h.p_vaddr;
     uint32_t aligned_size = align_to(h.p_filesz, 4);
-    if (verbose) printf("  addr %x size %x\n", load_address, aligned_size);
+    if (verbose) printf("  addr %x size %u\n", load_address, aligned_size);
     fwrite(&load_address, 1, sizeof(load_address), bin_fp);
     fwrite(&aligned_size, 1, sizeof(aligned_size), bin_fp);
     fwrite(elf.ptr + h.p_offset, 1, h.p_filesz, bin_fp);
@@ -825,6 +825,7 @@ int main(int argc, const char **argv) {
   ctx.baud = getenv("BAUD");          // Serial port baud rate
   ctx.fpar = getenv("FLASH_PARAMS");  // Flash parameters
   ctx.fspi = getenv("FLASH_SPI");     // Flash SPI pins
+  ctx.verbose = getenv("V") != NULL;  // Verbose output
   ctx.slip.buf = slipbuf;             // Set SLIP context - buffer
   ctx.slip.size = sizeof(slipbuf);    // Buffer size
   ctx.chip = s_known_chips[0];        // Set chip to unknown

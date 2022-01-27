@@ -9,7 +9,7 @@ MCUFLAGS  ?= -march=rv32imc -mabi=ilp32
 WARNFLAGS ?= -Wformat-truncation
 BLOFFSET  ?= 0  # 2nd stage bootloader flash offset
 TOOLCHAIN ?= docker run -it --rm -v $(MDK):$(MDK) -w $(CURDIR) mdashnet/riscv riscv-none-elf
-LINKFLAGS ?= $(MCUFLAGS) -T$(MDK)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
+LINKFLAGS ?= -T$(MDK)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
 else ifeq "$(ARCH)" "esp32"
 MCUFLAGS  ?= -mlongcalls -mtext-section-literals
 BLOFFSET  ?= 0x1000  # 2nd stage bootloader flash offset
