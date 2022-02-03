@@ -8,7 +8,10 @@ int main(void) {
   wdt_disable();
   gpio_output(led_pin);
 
-  struct w5500 wiz = {.mac = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}};
+  struct spi spi = {.mosi = 23, .miso = 19, .clk = 18, .cs = {5, -1, -1}};
+  spi_init(&spi);
+
+  struct w5500 wiz = {.spi = &spi, .cs = 5, .mac = {0xaa, 0xbb, 0xcc, 1, 2, 3}};
   w5500_init(&wiz);
 
   for (;;) {
