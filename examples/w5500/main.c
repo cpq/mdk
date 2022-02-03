@@ -1,5 +1,5 @@
 #include <sdk.h>
-#include "w5500.h"
+#include "drivers/w5500.h"
 
 static int led_pin = LED1;  // To override: make EXTRA_CFLAGS=-DLED1=5
 static int led_state = 0;

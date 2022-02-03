@@ -1,5 +1,6 @@
 PROG      ?= firmware
 MDK       ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+MNT       ?= $(realpath $(MDK)/..)
 ARCH      ?= esp32c3
 #TOOLCHAIN ?= riscv64-unknown-elf
 ESPUTIL   ?= $(MDK)/tools/esputil
@@ -8,7 +9,7 @@ ifeq "$(ARCH)" "esp32c3"
 MCUFLAGS  ?= -march=rv32imc -mabi=ilp32
 #WARNFLAGS += -Wformat-truncation
 BLOFFSET  ?= 0  # 2nd stage bootloader flash offset
-TOOLCHAIN ?= docker run -it --rm -v $(MDK):$(MDK) -w $(CURDIR) mdashnet/riscv riscv-none-elf
+TOOLCHAIN ?= docker run -it --rm -v $(MNT):$(MNT) -w $(CURDIR) mdashnet/riscv riscv-none-elf
 LINKFLAGS ?= -T$(MDK)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
 else ifeq "$(ARCH)" "esp32"
 MCUFLAGS  ?= -mlongcalls -mtext-section-literals
