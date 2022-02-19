@@ -109,7 +109,24 @@ PROVIDE(atoi = 0x4000044c);
 PROVIDE(atol = 0x40000450);
 PROVIDE(strtol = 0x40000454);
 PROVIDE(strtoul = 0x40000458);
+PROVIDE(printf = 0x40000040); 
+PROVIDE(__udivdi3 = 0x400008ac);
+PROVIDE(__umoddi3 = 0x400008bc);
 
+/*
+PROVIDE(__sprint_r = 0x40000480);
+PROVIDE(_fiprintf_r = 0x40000484);
+PROVIDE(_fprintf_r = 0x40000488);
+PROVIDE(_printf_common = 0x4000048c);
+PROVIDE(_printf_i = 0x40000490);
+PROVIDE(_vfiprintf_r = 0x40000494);
+PROVIDE(_vfprintf_r = 0x40000498);
+PROVIDE(fiprintf = 0x4000049c);
+PROVIDE(fprintf = 0x400004a0);
+PROVIDE(XXXprintf = 0x400004a4);
+PROVIDE(vfiprintf = 0x400004a8);
+PROVIDE(vfprintf = 0x400004ac);
+*/
 PROVIDE(uart_tx_one_char = 0x40000068);
 PROVIDE(uart_tx_one_char2 = 0x4000006c);
 PROVIDE(uart_rx_one_char = 0x40000070);

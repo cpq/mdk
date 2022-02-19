@@ -39,7 +39,7 @@ void *sbrk(int diff) {
 }
 
 void __assert_func(const char *a, int b, const char *c, const char *d) {
-  sdk_log("ASSERT %s %d %s %s\n", a, b, c, d);
+  printf("ASSERT %s %d %s %s\n", a, b, c, d);
   gpio_output(LED1);
   for (;;) spin(199999), gpio_toggle(LED1);
 }

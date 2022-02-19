@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -39,7 +40,6 @@ static inline void spin(volatile unsigned long count) {
 #include "log.h"
 #include "soc.h"
 #include "spi.h"
-#include "tcpip.h"
 #include "timer.h"
 #include "uart.h"
 #include "ws2812.h"

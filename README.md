@@ -122,10 +122,10 @@ API support matrix:
   ```
 - Log [src/log.h](src/log.h), [src/log.c](src/log.c)
   ```c
-  void sdk_log(const char *fmt, ...);   // Log message to UART 0
-                                        // Supported specifiers:
-                                        // %d, %x, %s, %p
-  void sdk_hexdump(const void *buf, size_t len);  // Hexdump buffer
+  void logf(const char *fmt, ...);   // Log message to UART 0
+                                     // Supported specifiers:
+                                     // %d, %x, %s, %p
+  void loghex(const void *buf, size_t len);  // Hexdump buffer
   ```
 - TCP/IP
 

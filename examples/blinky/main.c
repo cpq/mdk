@@ -9,7 +9,7 @@ int main(void) {
 
   for (;;) {
     gpio_write(led_pin, led_state);  // Blink an LED
-    sdk_log("%d\n", led_state);      // Print LED status
+    printf("%d\n", led_state);       // Print LED status
     led_state ^= 1;                  // Toggle state
     delay_ms(500);                   // Delay a bit
   }

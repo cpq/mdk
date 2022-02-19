@@ -46,14 +46,26 @@
 #define C3_APB_SARADC 0x60040000
 #define C3_AES_XTS 0x600CC000
 
-static inline unsigned long time_us(void) {
+static inline uint64_t systick(void) {
+  REG(C3_SYSTIMER)[1] = BIT(30);  // TRM 10.5
+  spin(1);
+  return ((uint64_t) REG(C3_SYSTIMER)[16] << 32) | REG(C3_SYSTIMER)[17];
+}
+
+static inline uint64_t time_us(void) {
+  return systick() >> 4;
+#if 0
   REG(C3_TIMERGROUP0)[3] = BIT(31);  // TRM 8.3.1, request to fetch timer value
   spin(1);                           // Is there a better way to wait?
-  return REG(C3_TIMERGROUP0)[1];     // Read low bits, ignore high
+  uint32_t hi = REG(C3_TIMERGROUP0)[2];  // High 20 bits
+  uint32_t lo = REG(C3_TIMERGROUP0)[1];  // Low 32 bits
+  return ((uint64_t) hi << 32) | lo;
+#endif
 }
 
 static inline void delay_us(unsigned long us) {
-  unsigned long until = time_us() + us;  // Handler counter wrap
+  //((void (*)(unsigned long)) 0x40000050)(us);  // ets_delay_us(us);
+  uint64_t until = time_us() + us;  // Handler counter wrap
   while (time_us() < until) spin(1);
 }
 
@@ -100,8 +112,27 @@ static inline void soc_init(void) {
   // REG(C3_RTCCNTL)[47] = 0; // RTC_APB_FREQ_REG -> freq >> 12
   ((void (*)(int)) 0x40000588)(160);  // ets_update_cpu_frequency(160)
 
+#if 0
   // Configure system clock timer, TRM 8.3.1, 8.9
   REG(C3_TIMERGROUP0)[1] = REG(C3_TIMERGROUP0)[2] = 0UL;  // Reset LO and HI
   REG(C3_TIMERGROUP0)[8] = 0;                             // Trigger reload
   REG(C3_TIMERGROUP0)[0] = (83U << 13) | BIT(12) | BIT(29) | BIT(30) | BIT(31);
+#endif
 }
+
+#define CSR_READ(name)                             \
+  static inline uint32_t csr_read_##name(void) {   \
+    uint32_t v;                                    \
+    asm volatile("csrr %0, " #name : "=r"(v) : :); \
+    return v;                                      \
+  }
+#define CSR_WRITE(name)                                              \
+  static inline uint32_t csr_write_##name(uint32_t v) {              \
+    uint32_t prev;                                                   \
+    asm volatile("csrrw %0, " #name ", %1" : "=r"(prev) : "r"(v) :); \
+    return prev;                                                     \
+  }
+
+CSR_READ(mvendorid);
+CSR_READ(mstatus);
+CSR_WRITE(mstatus);

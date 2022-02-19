@@ -6,6 +6,11 @@ static void logc(int c) {
   uart_write(0, (unsigned char) c);
 }
 
+int putchar(int c) {
+  logc(c);
+  return c;
+}
+
 static void logs(const char *buf, size_t len) {
   for (size_t i = 0; i < len; i++) logc(buf[i]);
 }
@@ -15,16 +20,16 @@ static unsigned char nibble(unsigned char c) {
 }
 
 #define ISPRINT(x) ((x) >= ' ' && (x) <= '~')
-void sdk_hexdump(const void *buf, size_t len) {
+void hexdump(const void *buf, size_t len) {
   const unsigned char *p = buf;
   unsigned char ascii[16] = "", alen = 0;
   for (size_t i = 0; i < len; i++) {
     if ((i % 16) == 0) {
       // Print buffered ascii chars
-      if (i > 0) logc('\t'), logs((char *) ascii, 16), logc('\n'), alen = 0;
+      if (i > 0) logs("  ", 2), logs((char *) ascii, 16), logc('\n'), alen = 0;
       // Print hex address, then \t
       logc(nibble((i >> 12) & 15)), logc(nibble((i >> 8) & 15)),
-          logc(nibble((i >> 4) & 15)), logc('0'), logc('\t');
+          logc(nibble((i >> 4) & 15)), logc('0'), logs("   ", 3);
     }
     logc(nibble(p[i] >> 4)), logc(nibble(p[i] & 15));  // Two nibbles, e.g. c5
     logc(' ');                                         // Space after hex number
@@ -32,6 +37,11 @@ void sdk_hexdump(const void *buf, size_t len) {
   }
   while (alen < 16) logs("   ", 3), ascii[alen++] = ' ';
   logc('\t'), logs((char *) ascii, 16), logc('\n');
+}
+
+#if 0
+int putchar(int c) {
+  return c;
 }
 
 static void logx(unsigned long v) {
@@ -58,7 +68,7 @@ static void logd(unsigned long v) {
   logc((unsigned char) (v + '0'));
 }
 
-void sdk_vlog(const char *fmt, va_list ap) {
+void vlog(const char *fmt, va_list ap) {
   int c, precision;
   while ((c = *fmt++) != '\0') {
     if (c != '%') {
@@ -107,9 +117,11 @@ void sdk_vlog(const char *fmt, va_list ap) {
   }
 }
 
-void sdk_log(const char *fmt, ...) {
+int printf(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  sdk_vlog(fmt, ap);
+  vlog(fmt, ap);
   va_end(ap);
+  return 0;
 }
+#endif

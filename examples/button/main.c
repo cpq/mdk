@@ -10,7 +10,7 @@ int main(void) {
     bool current = gpio_read(BTN1);
     if (current != previous) {
       gpio_write(LED1, !previous);
-      sdk_log("BTN: %d -> %d\n", previous, current);
+      printf("BTN: %d -> %d\n", previous, current);
       previous = current;
     }
     delay_ms(10);

@@ -24,6 +24,7 @@
 #include <direct.h>
 #include <io.h>
 #include <windows.h>
+#include <winsock2.h>
 #define mkdir(x, y) _mkdir(x)
 #if defined(_MSC_VER) && _MSC_VER < 1700
 #define snprintf _snprintf
@@ -41,10 +42,12 @@ typedef enum { false = 0, true = 1 } bool;
 // UNIX includes
 #include <dirent.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
@@ -69,14 +72,16 @@ struct chip {
 };
 
 struct ctx {
-  struct slip slip;  // SLIP state machine
-  const char *baud;  // Baud rate, e.g. "115200"
-  const char *port;  // Serial port, e.g. "/dev/ttyUSB0"
-  const char *fpar;  // Flash params, e.g. "0x220"
-  const char *fspi;  // Flash SPI pins: CLK,Q,D,HD,CS. E.g. "6,17,8,11,16"
-  bool verbose;      // Hexdump serial comms
-  int fd;            // Serial port file descriptor
-  struct chip chip;  // Chip descriptor
+  struct slip slip;        // SLIP state machine
+  const char *baud;        // Baud rate, e.g. "115200"
+  const char *port;        // Serial port, e.g. "/dev/ttyUSB0"
+  const char *fpar;        // Flash params, e.g. "0x220"
+  const char *fspi;        // Flash SPI pins: CLK,Q,D,HD,CS. E.g. "6,17,8,11,16"
+  bool verbose;            // Hexdump serial comms
+  int fd;                  // Serial port file descriptor
+  int sock;                // UDP socket for exchanging SLIP frames when monitor
+  struct sockaddr_in sin;  // UDP sockaddr of the remote peer
+  struct chip chip;        // Chip descriptor
 };
 
 static struct chip s_known_chips[] = {
@@ -148,11 +153,11 @@ static void uart_tx(unsigned char ch, void *arg) {
 static void usage(struct ctx *ctx) {
   printf("Defaults: BAUD=%s, PORT=%s\n", ctx->baud, ctx->port);
   printf("Usage:\n");
-  printf("  esputil [-v] [-b BAUD] [-p PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] readmem ADDR SIZE\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] readflash ADDR SIZE\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
+  printf("  esputil [-v] [-b BAUD] [-p PORT] [-udp PORT] monitor\n");
   printf("[-fspi FLASH_SPI] flash OFFSET BINFILE ...\n");
   printf("  esputil [-v] mkbin FIRMWARE.ELF FIRMWARE.BIN\n");
   printf("  esputil mkhex ADDRESS1 BINFILE1 ADDRESS2 BINFILE2 ...\n");
@@ -241,7 +246,7 @@ static int open_serial(const char *name, int baud, bool verbose) {
   return fd;
 }
 
-static int iowait(int fd, int ms) {
+static int iowait(int fd, int sock, int ms) {
   COMSTAT cs = {0};
   DWORD errors, flags = 0;
   int i;
@@ -338,16 +343,18 @@ static int open_serial(const char *name, int baud, bool verbose) {
 }
 
 // Return true if port is readable (has data), false otherwise
-static int iowait(int fd, int ms) {
+static int iowait(int fd, int sock, int ms) {
   int ready = 0;
   struct timeval tv = {.tv_sec = ms / 1000, .tv_usec = (ms % 1000) * 1000};
   fd_set rset;
   FD_ZERO(&rset);
-  FD_SET(fd, &rset);  // Listen to the UART fd
   FD_SET(0, &rset);   // Listen to stdin too
-  if (select(fd + 1, &rset, 0, 0, &tv) < 0) FD_ZERO(&rset);
+  FD_SET(fd, &rset);  // Listen to the UART fd
+  if (sock > 0) FD_SET(sock, &rset);
+  if (select((fd > sock ? fd : sock) + 1, &rset, 0, 0, &tv) < 0) FD_ZERO(&rset);
   if (FD_ISSET(0, &rset)) ready |= 1;
   if (FD_ISSET(fd, &rset)) ready |= 2;
+  if (sock > 0 && FD_ISSET(sock, &rset)) ready |= 4;
   return ready;
 }
 #endif  // End of UNIX-specific routines
@@ -387,10 +394,10 @@ static int cmd(struct ctx *ctx, uint8_t op, void *buf, uint16_t len,
 
   for (;;) {
     int i, n, ready, eofs, ecode;
-    ready = iowait(ctx->fd, timeout_ms);       // Wait until device is ready
-    if (!(ready & 2)) return 1;                // Interrupted, fail
-    n = read(ctx->fd, tmp, sizeof(tmp));       // Read from a device
-    if (n <= 0) fail("Serial line closed\n");  // Doh. Unplugged maybe?
+    ready = iowait(ctx->fd, ctx->sock, timeout_ms);  // Wait for data
+    if (!(ready & 2)) return 1;                      // Interrupted, fail
+    n = read(ctx->fd, tmp, sizeof(tmp));             // Read from a device
+    if (n <= 0) fail("Serial line closed\n");        // Doh. Unplugged maybe?
     // if (ctx->verbose) dump("--RAW_RESPONSE:", tmp, n);
     for (i = 0; i < n; i++) {
       size_t r = slip_recv(tmp[i], &ctx->slip);  // Pass to SLIP state machine
@@ -445,7 +452,7 @@ static bool chip_connect(struct ctx *ctx) {
 }
 
 static void monitor(struct ctx *ctx) {
-  int i, ready = iowait(ctx->fd, 1000);
+  int i, ready = iowait(ctx->fd, ctx->sock, 1000);
   if (ready & 2) {
     uint8_t buf[BUFSIZ];
     int n = read(ctx->fd, buf, sizeof(buf));   // Read from a device
@@ -456,6 +463,9 @@ static void monitor(struct ctx *ctx) {
       size_t len = slip_recv(buf[i], &ctx->slip);            // Pass to SLIP
       if (len == 0 && ctx->slip.mode == 0) putchar(buf[i]);  // In serial mode
       if (len <= 0) continue;
+      if (len > 0 && ctx->slip.mode && ctx->sock)
+        sendto(ctx->sock, ctx->slip.buf, ctx->slip.len, 0,
+               (struct sockaddr *) &ctx->sin, sizeof(ctx->sin));
       if (ctx->verbose) dump("SR", ctx->slip.buf, len);
     }
     fflush(stdout);
@@ -465,6 +475,16 @@ static void monitor(struct ctx *ctx) {
     int n = read(0, buf, sizeof(buf));
     if (n > 0 && ctx->verbose) dump("WRITE", buf, n);
     for (i = 0; i < n; i++) uart_tx(buf[i], &ctx->fd);
+  }
+  if (ready & 4) {  // Something in the UDP socket
+    uint8_t buf[2048];
+    unsigned sl = sizeof(ctx->sin);
+    int n = recvfrom(ctx->sock, buf, sizeof(buf), 0,
+                     (struct sockaddr *) &ctx->sin, &sl);
+    if (n > 0) {
+      if (ctx->verbose) dump("RSOCK", buf, n);
+      slip_send(buf, n, uart_tx, &ctx->fd);  // Inject frame
+    }
   }
 }
 
@@ -864,13 +884,26 @@ static int unhex(const char *hexfile, const char *dir) {
   return EXIT_SUCCESS;
 }
 
+static int open_udp_socket(const char *portspec) {
+  int sock;
+  struct sockaddr_in sin;
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons((unsigned short) atoi(portspec));
+  sin.sin_addr.s_addr = 0;
+  sock = socket(AF_INET, SOCK_DGRAM, 17);
+  bind(sock, (struct sockaddr *) &sin, sizeof(sin));
+  return sock;
+}
+
 int main(int argc, const char **argv) {
-  const char *temp_dir = getenv("TMP_DIR");  // Temp dir for unhex
-  const char **command = NULL;               // Command to perform
-  uint8_t slipbuf[32 * 1024];                // Buffer for SLIP context
-  struct ctx ctx = {0};                      // Program context
+  const char *temp_dir = getenv("TMP_DIR");   // Temp dir for unhex
+  const char *udp_port = getenv("UDP_PORT");  // Listening UDP port
+  const char **command = NULL;                // Command to perform
+  uint8_t slipbuf[32 * 1024];                 // Buffer for SLIP context
+  struct ctx ctx = {0};                       // Program context
   int i;
 
+  ctx.port = getenv("PORT");          // Serial port
   ctx.port = getenv("PORT");          // Serial port
   ctx.baud = getenv("BAUD");          // Serial port baud rate
   ctx.fpar = getenv("FLASH_PARAMS");  // Flash parameters
@@ -890,6 +923,7 @@ int main(int argc, const char **argv) {
 
   if (ctx.baud == NULL) ctx.baud = "115200";  // Default baud rate
   if (temp_dir == NULL) temp_dir = "tmp";     // Default temp dir
+  if (udp_port == NULL) udp_port = "1999";    // Default UDP_PORT
 
   // Parse options
   for (i = 1; i < argc; i++) {
@@ -903,6 +937,8 @@ int main(int argc, const char **argv) {
       ctx.fspi = argv[++i];
     } else if (strcmp(argv[i], "-tmp") == 0 && i + 1 < argc) {
       temp_dir = argv[++i];
+    } else if (strcmp(argv[i], "-udp") == 0 && i + 1 < argc) {
+      udp_port = argv[++i];
     } else if (strcmp(argv[i], "-v") == 0) {
       ctx.verbose = true;
     } else if (argv[i][0] == '-') {
@@ -925,6 +961,7 @@ int main(int argc, const char **argv) {
   }
 
   // Commands that require serial port. First, open serial.
+  ctx.sock = open_udp_socket(udp_port);
   ctx.fd = open_serial(ctx.port, 115200, ctx.verbose);
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
