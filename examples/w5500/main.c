@@ -9,13 +9,6 @@
 #include "drivers/w5500.h"
 #include "slip.h"
 
-#if 0
-static void ether_tx(struct mip_if *ifp) {
-  int n = w5500_tx(ifp->userdata, ifp->frame, (uint16_t) ifp->frame_len);
-  // printf("tx: %d %x\n", n, w5500_r1(ifp->userdata, W5500_CR, 0x2e));
-}
-#endif
-
 static void uart_tx(unsigned char c, void *arg) {
   uart_write(0, c);
   (void) arg;
@@ -39,13 +32,14 @@ int main(void) {
 
   struct slip slip = {.size = 1536, .buf = malloc(slip.size)};
   printf("Allocated %d bytes @ %p for netif frame\n", slip.size, slip.buf);
+
+  uint8_t c, s1 = 0, s2 = 0;
   for (;;) {
-    uint8_t c;
     if (uart_read(0, &c)) {
       size_t len = slip_recv(c, &slip);
       if (len > 0) {
-        int n = w5500_tx(&wiz, slip.buf, (uint16_t) len);
-        printf("TX: %d/%d %x\n", n, (int) len, w5500_r1(&wiz, W5500_CR, 0x2e));
+        printf("TX %u\n", len);
+        w5500_tx(&wiz, slip.buf, (uint16_t) len);
       }
       if (len == 0 && slip.mode == 0) putchar(c);
     }
@@ -55,30 +49,10 @@ int main(void) {
       slip_send(buf, len, uart_tx, NULL);
       printf("RX: %d\n", (int) len);
     }
+    s2 = w5500_status(&wiz);
+    if (s1 != s2) s1 = s2, printf("Ethernet status changed to: %x\n", s1);
+    delay_ms(10);
   }
-
-#if 0
-  uint8_t frame[2048];
-  struct mip_if mif = {.tx = tx,
-                       .userdata = &wiz,
-                       .frame = frame,
-                       .frame_max_size = sizeof(frame)};
-
-  int pin = 9;
-  gpio_input(pin);
-  for (;;) {
-    mif.frame_len = w5500_rx(&wiz, mif.frame, (uint16_t) mif.frame_max_size);
-    if (mif.frame_len > 0) {
-      printf("rx: %u\n", mif.frame_len);
-      // if (mif.frame_len < 100) hexdump(mif.frame, mif.frame_len);
-      mip_rx(&mif);
-    }
-    mip_poll(&mif, time_us() / 1000);
-    delay_ms(1);
-    // printf("%08llx %lx %d %x\n", time_us(), csr_read_mvendorid(),
-    //       gpio_read(pin), w5500_r1(&wiz, W5500_CR, 0x2e));
-  }
-#endif
 
   return 0;
 }
