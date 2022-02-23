@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 // https://datatracker.ietf.org/doc/html/rfc1055
-enum { END = 0300, ESC = 0333, ESC_END = 0334, ESC_ESC = 0335 };
+enum { END = 192, ESC = 219, ESC_END = 220, ESC_ESC = 221 };
 
 static __inline void slip_send(const void *buf, size_t len,
                                void (*fn)(unsigned char, void *), void *arg) {

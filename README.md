@@ -8,7 +8,7 @@ TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical
 It is completely independent from the ESP-IDF and does not use any ESP-IDF
 tools or files. The only requirement is GCC crosscompiler.
 
-A screenshot below demonstrates a [examples/c3ws2812](examples/c3ws2812)
+A screenshot below demonstrates a [examples/ws2812](examples/ws2812)
 RGB LED firmware flashed on a ESP32-C3-DevKitM-1 board. It takes < 2 seconds
 for a full firmware rebuild and flash:
 

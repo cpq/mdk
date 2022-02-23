@@ -35,10 +35,11 @@ int main(void) {
 
   uint8_t c, s1 = 0, s2 = 0;
   for (;;) {
-    if (uart_read(0, &c)) {
+    while (uart_read(0, &c)) {
       size_t len = slip_recv(c, &slip);
       if (len > 0) {
         printf("TX %u\n", len);
+        // hexdump(slip.buf, len);
         w5500_tx(&wiz, slip.buf, (uint16_t) len);
       }
       if (len == 0 && slip.mode == 0) putchar(c);
@@ -47,11 +48,10 @@ int main(void) {
     size_t len = w5500_rx(&wiz, buf, (uint16_t) sizeof(buf));
     if (len > 0) {
       slip_send(buf, len, uart_tx, NULL);
-      printf("RX: %d\n", (int) len);
+      printf("RX: %u\n", len);
     }
     s2 = w5500_status(&wiz);
     if (s1 != s2) s1 = s2, printf("Ethernet status changed to: %x\n", s1);
-    delay_ms(10);
   }
 
   return 0;

@@ -481,6 +481,7 @@ static void monitor(struct ctx *ctx) {
     unsigned sl = sizeof(ctx->sin);
     int n = recvfrom(ctx->sock, buf, sizeof(buf), 0,
                      (struct sockaddr *) &ctx->sin, &sl);
+    // printf("GOT %d\n", n);
     if (n > 0) {
       if (ctx->verbose) dump("RSOCK", buf, n);
       slip_send(buf, n, uart_tx, &ctx->fd);  // Inject frame
