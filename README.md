@@ -12,7 +12,7 @@ A screenshot below demonstrates a [examples/ws2812](examples/ws2812)
 RGB LED firmware flashed on a ESP32-C3-DevKitM-1 board. It takes < 2 seconds
 for a full firmware rebuild and flash:
 
-![](examples/c3ws2812/rainbow.gif)
+![](examples/ws2812/rainbow.gif)
 
 # Environment setup
 
