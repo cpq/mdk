@@ -14,7 +14,7 @@ LINKFLAGS ?= -T$(MDK)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections 
 else ifeq "$(ARCH)" "esp32"
 MCUFLAGS  ?= -mlongcalls -mtext-section-literals
 BLOFFSET  ?= 0x1000  # 2nd stage bootloader flash offset
-TOOLCHAIN ?= docker run -it --rm -v $(MDK):$(MDK) -w $(CURDIR) espressif/idf xtensa-esp32-elf
+TOOLCHAIN ?= docker run -it --rm -v $(MNT):$(MNT) -w $(CURDIR) espressif/idf xtensa-esp32-elf
 LINKFLAGS ?= $(MCUFLAGS) -T$(MDK)/make/$(ARCH).ld -nostdlib -nostartfiles -Wl,--gc-sections $(EXTRA_LINKFLAGS)
 else
 OPTFLAGS = -O0 -g3

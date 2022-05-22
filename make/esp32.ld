@@ -84,3 +84,5 @@ PROVIDE(strsep = 0x40001734);
 PROVIDE(strspn = 0x4000c648);
 PROVIDE(strstr = 0x4000c674);
 PROVIDE(strtol = 0x4005681c);
+
+PROVIDE ( printf = 0x40007d54 );
