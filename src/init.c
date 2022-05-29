@@ -1,7 +1,7 @@
 // Copyright (c) 2021 Cesanta
 // All rights reserved
 
-#include "sdk.h"
+#include "mdk.h"
 
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
 #else

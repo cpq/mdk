@@ -1,19 +1,19 @@
-#include <sdk.h>
+#include <mdk.h>
 
 static unsigned readn(struct spi *spi, uint8_t reg, int n) {
   unsigned rx = 0;
-  spi_begin(spi, 0);
+  spi_begin(spi);
   spi_txn(spi, reg | 0x80);
   for (int i = 0; i < n; i++) rx <<= 8, rx |= spi_txn(spi, 0);
-  spi_end(spi, 0);
+  spi_end(spi);
   return rx;
 }
 
 static void write8(struct spi *spi, uint8_t reg, uint8_t val) {
-  spi_begin(spi, 0);
+  spi_begin(spi);
   spi_txn(spi, (uint8_t) (reg & ~0x80));
   spi_txn(spi, val);
-  spi_end(spi, 0);
+  spi_end(spi);
 }
 
 uint16_t swap16(uint16_t val) {
@@ -43,7 +43,7 @@ int32_t read_temp(struct spi *spi) {
 int main(void) {
   wdt_disable();
 
-  struct spi bme280 = {.mosi = 23, .miso = 19, .clk = 18, .cs = {5, -1, -1}};
+  struct spi bme280 = {.mosi = 23, .miso = 19, .clk = 18, .cs = 5};
   spi_init(&bme280);
 
   write8(&bme280, 0xe0, 0xb6);          // Soft reset

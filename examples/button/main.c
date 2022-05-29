@@ -1,4 +1,4 @@
-#include <sdk.h>
+#include <mdk.h>
 
 int main(void) {
   wdt_disable();

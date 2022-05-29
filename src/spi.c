@@ -1,22 +1,17 @@
 // Copyright (c) 2021 Cesanta
 // All rights reserved
 
-#pragma once
-#include "gpio.h"
+#include "mdk.h"
 
-struct spi {
-  int miso, mosi, clk, cs, spin;
-};
-
-static inline void spi_begin(struct spi *spi) {
+void spi_begin(struct spi *spi) {
   gpio_write(spi->cs, 0);
 }
 
-static inline void spi_end(struct spi *spi) {
+void spi_end(struct spi *spi) {
   gpio_write(spi->cs, 1);
 }
 
-static inline bool spi_init(struct spi *spi) {
+bool spi_init(struct spi *spi) {
   if (spi->miso < 0 || spi->mosi < 0 || spi->clk < 0) return false;
   gpio_input(spi->miso);
   gpio_output(spi->mosi);
@@ -29,7 +24,7 @@ static inline bool spi_init(struct spi *spi) {
 }
 
 // Send a byte, and return a received byte
-static inline unsigned char spi_txn(struct spi *spi, unsigned char tx) {
+unsigned char spi_txn(struct spi *spi, unsigned char tx) {
   unsigned count = spi->spin <= 0 ? 9 : (unsigned) spi->spin;
   unsigned char rx = 0;
   for (int i = 0; i < 8; i++) {

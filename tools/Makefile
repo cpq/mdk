@@ -29,7 +29,7 @@ test: unit_test.c
 examples: examples-build examples-clean
 
 examples-build:
-	for d in ../examples/*; do make -C $$d clean build || break; done
+	for a in esp32c3 esp32 ; do for d in ../examples/*; do make -C $$d clean build ARCH=$$a || exit 1; done ; done
 
 examples-clean:
 	for d in ../examples/*; do make -C $$d clean ; done

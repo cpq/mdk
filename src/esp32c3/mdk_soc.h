@@ -3,6 +3,10 @@
 
 #pragma once
 
+#include "mdk_util.h"
+
+enum { GPIO_OUT_EN = 8, GPIO_OUT_FUNC = 341, GPIO_IN_FUNC = 85 };
+
 #define C3_SYSTEM 0x600c0000
 #define C3_SENSITIVE 0x600c1000
 #define C3_INTERRUPT 0x600c2000

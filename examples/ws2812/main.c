@@ -1,7 +1,7 @@
 // Copyright (c) Charles Lohr
 // All rights reserved
 
-#include <sdk.h>
+#include <mdk.h>
 
 // On the ESP32C3 dev boards, the WS2812 LED is connected to GPIO 8
 static int ws_2812_pin = 8;
@@ -14,7 +14,7 @@ static uint8_t hueval(int value) {
   } else if (value < 768) {
     return 255;
   } else if (value < 1024) {
-    return (uint8_t)(1023 - value);
+    return (uint8_t) (1023 - value);
   } else {
     return 0;
   }

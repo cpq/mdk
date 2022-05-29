@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sdk.h>
+#include <mdk.h>
 
 #if defined(__unix) || defined(__unix__) || defined(__APPLE__)
 #else

@@ -1,7 +1,7 @@
 // Copyright (c) 2021 Cesanta
 // All rights reserved
 
-#include "sdk.h"
+#include "mdk.h"
 
 void uart_init(int no, int tx, int rx, int baud) {
   enum { FIFO = 0, CLK_DIV = 5, STATUS = 7, CONF0, CONF1, CLK_CONF = 30 };

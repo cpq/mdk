@@ -10,7 +10,7 @@
 #define ESP32_FLASH_MMU_TABLE_PRO 0x3ff10000
 #define ESP32_FLASH_MMU_TABLE_APP 0x3ff12000
 #define ESP32_DPORT_END 0x3ff13FFC
-#define ESP32_UART 0x3ff40000
+#define ESP32_UART0 0x3ff40000
 #define ESP32_SPI1 0x3ff42000
 #define ESP32_SPI0 0x3ff43000
 #define ESP32_GPIO 0x3ff44000
@@ -60,13 +60,27 @@
 #define ESP32_PWM3 0x3ff70000
 #define PERIPHS_SPI_ENCRYPTADDR ESP32_SPI_ENCRYPT
 
-#define NOPS_PER_MS 26643
-static inline void delay_us(volatile unsigned long us) {
-  spin(us * NOPS_PER_MS / 1000);
+#include "mdk_util.h"
+
+static inline uint64_t systick(void) {
+  REG(ESP32_TIMERGROUP0)[3] = 1;
+  spin(1);
+  return ((uint64_t) REG(ESP32_TIMERGROUP0)[2] << 32) |
+         REG(ESP32_TIMERGROUP0)[1];
 }
 
-static inline void delay_ms(volatile unsigned long ms) {
-  spin(ms * NOPS_PER_MS);
+static inline uint64_t time_us(void) {
+  return systick() >> 4;
+}
+
+static inline void delay_us(unsigned long us) {
+  uint64_t until = time_us() + us;  // Handler counter wrap
+  while (time_us() < until) spin(1);
+}
+
+static inline void delay_ms(unsigned long ms) {
+  delay_us(ms * 1000);
+  // spin(ms * 8000);
 }
 
 static inline void ledc_enable(void) {
@@ -84,5 +98,16 @@ static inline void wdt_disable(void) {
   REG(ESP32_TIMERGROUP1)[18] = 0;  // Disable task WDT
 }
 
+static inline void cpu_freq_240(void) {
+  // TRM 3.2.3. We must set SEL_0 = 1, SEL_1 = 2
+  // *SEL_0: The vaule of register RTC_CNTL_SOC_CLK_SEL
+  // *SEL_1: The vaule of register CPU_CPUPERIOD_SEL
+  REG(ESP32_RTCCNTL)[28] |= 1UL << 27;  // Register 31.24  SEL0 -> 1
+  REG(ESP32_DPORT)[15] |= 2UL << 0;     // Register 5.9    SEL1 -> 2
+  REG(ESP32_UART0)[5] = 0x4001e0;       // UART_CLKDIV_REG
+}
+
 static inline void soc_init(void) {
+  REG(ESP32_TIMERGROUP0)[0] |= BIT(31);  // Enable TIMG0
+  cpu_freq_240();
 }
