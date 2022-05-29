@@ -976,6 +976,9 @@ int main(int argc, const char **argv) {
   } else if (strcmp(*command, "readflash") == 0) {
     readflash(&ctx, &command[1]);
   } else if (strcmp(*command, "monitor") == 0) {
+    if (atoi(ctx.baud) != 115200) {
+      change_baud(ctx.fd, atoi(ctx.baud), ctx.verbose);
+    }
     while (s_signo == 0) monitor(&ctx);
   } else {
     printf("Unknown command: %s\n", *command);
