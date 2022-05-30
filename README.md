@@ -67,7 +67,7 @@ include $(MDK)/$(ARCH)/build.mk
   - `EXTRA_LINKFLAGS` - Extra linker flags. Default: empty
 - **Makefile targets:**
   - `make clean` - Clean up build artifacts
-  - `make build` - Build firmware in a project's `build/` directory
+  - `make build` - Build firmware in a project directory
   - `make flash` - Flash firmware. Needs PORT variable set
   - `make monitor` - Run serial monitor. Needs PORT variable set
 - **Board defaults:** - overridable by e.g. `EXTRA_CFLAGS="-DLED1=3"`
@@ -131,7 +131,7 @@ Usage:
 Example: flash MDK-built ESP32C3 firmware:
 
 ```sh
-$ esputil flash 0 ./build/firmware.bin
+$ esputil flash 0 firmware.bin
 ```
 
 Example: flash ESP-IDF built firmware on ESP32-PICO-Kit board:
@@ -223,7 +223,7 @@ flag, which is an integer value that represent 3 hex nimbles.
 For example `fp 0x22f` sets flash to DIO, 4MB, 80MHz:
 
 ```sh
-$ esputil -fp 0x22f flash 0 build/firmware.bin
+$ esputil -fp 0x220 flash 0 firmware.bin
 ```
 
 ## FLash SPI pin settings
