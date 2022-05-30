@@ -11,7 +11,7 @@ esputil: esputil.c
 	$(CC) $(CFLAGS) $? -o $(BINDIR)/$@
 
 esputil.exe: esputil.c
-	$(DOCKER) mdashnet/vc98 wine cl /nologo /W3 /Os $? ws2_32.lib /Fe$@
+	$(DOCKER) mdashnet/vc98 wine cl /nologo /W3 /MD /Os $? ws2_32.lib /Fe$@
 #	$(DOCKER) mdashnet/vc2017 wine64 cl /nologo /W3 /Os $? /Fe$@
 
 test_esputil_windows: esputil.exe
