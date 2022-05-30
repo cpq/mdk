@@ -76,6 +76,12 @@ include $(MDK)/$(ARCH)/build.mk
 
 # API reference
 
+Currently, a limited API is implemented. The plan is to implement WiFi
+primitives in order to integrate [cesanta/mongoose](https://github.com/cesanta/mongoose)
+networking library. Unfortunately radio registers are not documented
+by Espressif. Please [contact us](https://mongoose.ws/contact/) if
+you have more information available on WiFi/BLE registers.
+
 - GPIO
   - `void gpio_output(int pin);` - set pin mode to OUTPUT
   - `void gpio_input(int pin);` - set pin mode to INPUT
@@ -248,7 +254,7 @@ $ esputil -fspi 6,17,8,11,16 flash 4096 build/bootloader/bootloader.bin
 Written build/bootloader/bootloader.bin, 24736 bytes @ 0x1000
 ```
 
-# Tookchain Docker images
+# Toolchain Docker images
 
 By default, docker is used for builds. For `ARCH=esp32`, the `espressif/idf`
 image is used. For `ARCH=esp32c3`, the `mdashnet/riscv` image is used,
