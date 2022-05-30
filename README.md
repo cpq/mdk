@@ -1,12 +1,13 @@
-# MDK (Minimal Development Kit) - a baremetal ESP32/ESP32C3 SDK
+# A baremetal, single header ESP32/ESP32C3 SDK
 
-A bare metal make-based SDK for the ESP32/ESP32C3 chips.  Written from scratch
-using datasheets ( [ESP32 C3
+A bare metal, single header make-based SDK for the ESP32/ESP32C3 chips.
+Written from scratch using datasheets ( [ESP32 C3
 TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf),
 [ESP32
 TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)).
 It is completely independent from the ESP-IDF and does not use any ESP-IDF
-tools or files. The only requirement is GCC crosscompiler.
+tools or files. It implements its own flashing utility `esputil` (see below),
+written in C, with no dependencies or python or anything else.
 
 A screenshot below demonstrates a [examples/ws2812](examples/ws2812)
 RGB LED firmware flashed on a ESP32-C3-DevKitM-1 board. It takes < 2 seconds
@@ -14,13 +15,23 @@ for a full firmware rebuild and flash:
 
 ![](examples/ws2812/rainbow.gif)
 
+Currently, "esp32c3" and "esp32" architectures are supported.
+MDK file structure is as follows:
+
+- $(ARCH)/link.ld - a linker script file. ARCH is esp32 or esp32c3
+- $(ARCH)/boot.c - a startup code 
+- $(ARCH)/mdk.h - a single header that implements MDK API
+- $(ARCH)/build.mk - a helper Makefile for building projects
+
+
 # Environment setup
 
 1. Use Linux or MacOS. Install [Docker](https://docker.com)
 2. Execute the following shell commands (or add them to your `~/.profile`):
   ```sh
-  $ export MDK=/path/to/mdk                 # Points to MDK directory
-  $ export PORT=/dev/ttyUSB0                # Serial port for flashing
+  $ export MDK=/path/to/mdk     # Points to MDK directory
+  $ export ARCH=esp32c3         # Valid choices: esp32 esp32c3
+  $ export PORT=/dev/ttyUSB0    # Serial port for flashing
   ```
 
 Verify setup by building and flashing a blinky example firmware.
@@ -40,14 +51,14 @@ SOURCES = main.c another_file.c
 EXTRA_CFLAGS ?=
 EXTRA_LINKFLAGS ?=
 
-include $(MDK)/make/build.mk
+include $(MDK)/$(ARCH)/build.mk
 ```
 
 # Environment reference
 
 - **Environment / Makefile variables:**
-  - `ARCH` - Architecture. Possible values: esp32c3, esp32, posix. Default: esp32c3
-  - `TOOLCHAIN` - GCC binary prefix. Default: riscv64-unknown-elf
+  - `ARCH` - Architecture. Possible values: esp32c3, esp32
+  - `TOOLCHAIN` - Crosscompiler prefix. riscv64-unknown-elf or xtensa-esp32-elf
   - `PORT` - Serial port for flashing. Default: /dev/ttyUSB0
   - `FLASH_PARAMS` - Flash parameters, see below. Default: empty
   - `FLASH_SPI` - Flash SPI settings, see below. Default: empty
@@ -58,77 +69,35 @@ include $(MDK)/make/build.mk
   - `make build` - Build firmware in a project's `build/` directory
   - `make flash` - Flash firmware. Needs PORT variable set
   - `make monitor` - Run serial monitor. Needs PORT variable set
-  - `make unix` - Build Mac/Linux executable firmware, see "UNIX mode" section below
-- **SDK Preprocessor definitions:**
+- **Board defaults:** - overridable by e.g. `EXTRA_CFLAGS="-DLED1=3"`
   - `LED1` - User LED pin. Default: 2
   - `BTN1` - User button pin. Default: 9
 
 
 # API reference
 
-API support matrix:
-
-| Name    | GPIO | SPI | I2C | UART | WiFi | Timer | System | RTOS |
-| ----    | ---- | --- | --- | ---- | ---- | ----- | ------ | ---- |
-| ESP32C3 | yes  | yes |  -  |  yes |  -   |  yes  |  yes   | -    |
-| ESP32   | yes  | yes |  -  |  -   |  -   |  yes  |  yes   | -    |
-
-- GPIO [src/ARCH/gpio.h](src/esp32c3/gpio.h)
-  ```c
-  void gpio_output(int pin);              // Set pin mode to OUTPUT
-  void gpio_input(int pin);               // Set pin mode to INPUT
-  void gpio_write(int pin, bool value);   // Set pin to low (false) or high
-  void gpio_toggle(int pin);              // Toggle pin value
-  bool gpio_read(int pin);                // Read pin value
-  ```
-- SPI [src/spi.h](src/spi.h), [src/spi.c](src/spi.c)
-  ```c
-  // SPI descriptor. Specifies pins for MISO, MOSI, CLK and chip select
-  struct spi { int miso, mosi, clk, cs[3]; };
-
-  bool spi_init(struct spi *spi);           // Init SPI
-  void spi_begin(struct spi *spi, int cs);  // Start SPI transaction
-  void spi_end(struct spi *spi, int cs);    // End SPI transaction
-  unsigned char spi_txn(struct spi *spi, unsigned char);   // Do SPI transaction
-  ```
-- UART [src/uart.h](src/uart.h), [src/ARCH/uart.c](src/esp32c3/uart.c)
-  ```c
-  void uart_init(int no, int tx, int rx, int baud);   // Initialise UART
-  bool uart_read(int no, uint8_t *c);   // Read byte. Return true on success
-  void uart_write(int no, uint8_t c);   // Write byte. Block if FIFO is full
-  ```
-- SOC [src/ARCH/soc.h](src/esp32c3/soc.h)
-  ```c
-  void wdt_disable(void);   // Disable watchdog
-  int sdk_ram_used(void);           // Return used RAM in bytes
-  int sdk_ram_free(void);           // Return free RAM in bytes
-  unsigned long time_us(void);      // Return uptime in microseconds
-  void delay_us(unsigned long us);  // Block for "us" microseconds
-  void delay_ms(unsigned long ms);  // Block for "ms" milliseconds
-  void spin(unsigned long count);   // Execute "count" no-op instructions
-  ```
-- Timer [src/timer.h](src/timer.h)
-  ```c
-  struct timer {
-    uint64_t period;       // Timer period in micros
-    uint64_t expire;       // Expiration timestamp in micros
-    void (*fn)(void *);    // Function to call
-    void *arg;             // Function argument
-    struct timer *next;    // Linkage
-  };
-
-  #define TIMER_ADD(head_, p_, fn_, arg_)
-  void timers_poll(struct timer *head, uint64_t now);
-  ```
-- Log [src/log.h](src/log.h), [src/log.c](src/log.c)
-  ```c
-  void logf(const char *fmt, ...);   // Log message to UART 0
-                                     // Supported specifiers:
-                                     // %d, %x, %s, %p
-  void loghex(const void *buf, size_t len);  // Hexdump buffer
-  ```
-- TCP/IP
-
+- GPIO
+  - `void gpio_output(int pin);` - set pin mode to OUTPUT
+  - `void gpio_input(int pin);` - set pin mode to INPUT
+  - `void gpio_write(int pin, bool value);` - set pin to low (false) or high
+  - `void gpio_toggle(int pin);` - toggle pin value
+  - `bool gpio_read(int pin);` - read pin value
+- SPI
+  - `struct spi { int miso, mosi, clk, cs; };` - an SPI descriptor
+  - `bool spi_init(struct spi *spi);` - initialise SPI
+  - `void spi_begin(struct spi *spi, int cs);` - start SPI transaction
+  - `void spi_end(struct spi *spi, int cs);` - end SPI transaction
+  - `uin8_t spi_txn(struct spi *spi, uint8_t);` - perform SPI transaction: write one byte and read the response
+- UART 
+  - `void uart_init(int no, int tx, int rx, int baud);` - initialise UART
+  - `bool uart_read(int no, uint8_t *c);` - read byte. Return true on success
+  - `void uart_write(int no, uint8_t c);` - write byte. Block if FIFO is full
+- Misc
+  - `void wdt_disable(void);` - disable watchdog
+  - `uint64_t uptime_us(void);` - return uptime in microseconds
+  - `void delay_us(unsigned long us);` - block for "us" microseconds
+  - `void delay_ms(unsigned long ms);` - block for "ms" milliseconds
+  - `void spin(unsigned long count);` - execute "count" no-op instructions
 
 # esputil
 
@@ -216,13 +185,18 @@ The image should be of the following format:
 
    0xe9 - Espressif image magic number. All images must start with 0xe9
    N    - a number of segments in the image
-   F1  - flash mode. 0: QIO, 1: QOUT, 2: DIO, 3: DOUT
-   F2  - flash size (high 4 bits) and flash frequency (low 4 bits):
+   F1   - flash mode. 0: QIO, 1: QOUT, 2: DIO, 3: DOUT
+   F2   - flash size (high 4 bits) and flash frequency (low 4 bits):
             size: 0: 1MB, 0x10: 2MB, 0x20: 4MB, 0x30: 8MB, 0x40: 16MB
             freq: 0: 40m, 1: 26m, 2: 20m, 0xf: 80m
    ENTRY - 4-byte entry point address in little endian
    C     - Chip ID. 0: ESP32, 5: ESP32C3
    V     - Chip revision
+
+   Segment format: | ADDR | SIZE | DATA |
+      ADDR  - segment load address
+      SIZE  - segment size, aligned to 4 bytes
+      DATA  - segment data, padded with 0 to 16-byte boundary
 ```
 
 ## Flash parameters
@@ -272,4 +246,15 @@ a correct SPI pin settings:
 ```sh
 $ esputil -fspi 6,17,8,11,16 flash 4096 build/bootloader/bootloader.bin 
 Written build/bootloader/bootloader.bin, 24736 bytes @ 0x1000
+```
+
+# Tookchain Docker images
+
+By default, docker is used for builds. For `ARCH=esp32`, the `espressif/idf`
+image is used. For `ARCH=esp32c3`, the `mdashnet/riscv` image is used,
+which is built using the following Dockerfile:
+
+```Dockerfile
+FROM alpine:edge
+RUN apk add --update build-base gcc-riscv-none-elf newlib-riscv-none-elf && rm -rf /var/cache/apk/*
 ```

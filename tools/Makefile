@@ -5,7 +5,7 @@ DOCKER = docker run $(DA) --rm -e Tmp=. -e WINEDEBUG=-all -v $(CWD):$(CWD) -w $(
 SERIAL_PORT ?= /dev/ttyUSB0
 
 all:
-	@echo available targets: slipterm esputil test examples
+	@echo available targets: slipterm esputil test
 
 esputil: esputil.c
 	$(CC) $(CFLAGS) $? -o $(BINDIR)/$@
@@ -23,16 +23,5 @@ test_esputil_windows: esputil.exe
 slipterm: slipterm.c
 	$(CC) $(CFLAGS) $? -lpcap -lutil -o $(BINDIR)/$@
 
-test: unit_test.c
-	$(CC) -I../include -W -Wall -g3 $? -o /tmp/t && /tmp/t
-
-examples: examples-build examples-clean
-
-examples-build:
-	for a in esp32c3 esp32 ; do for d in ../examples/*; do make -C $$d clean build ARCH=$$a || exit 1; done ; done
-
-examples-clean:
-	for d in ../examples/*; do make -C $$d clean ; done
-
-clean: examples-clean
+clean:
 	rm -rf slipterm esputil *.dSYM *.o *.obj _CL*

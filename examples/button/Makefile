@@ -1,3 +1,3 @@
 SOURCES = main.c
 
-include ../../make/build.mk
+include $(MDK)/$(ARCH)/build.mk
