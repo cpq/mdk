@@ -7,7 +7,8 @@ TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_techni
 TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)).
 It is completely independent from the ESP-IDF and does not use any ESP-IDF
 tools or files. It implements its own flashing utility `esputil` (see below),
-written in C, with no dependencies or python or anything else.
+written in C, with no dependencies on python or anything else, working on
+Mac, Linux, and Windows.
 
 A screenshot below demonstrates a [examples/ws2812](examples/ws2812)
 RGB LED firmware flashed on a ESP32-C3-DevKitM-1 board. It takes < 2 seconds
