@@ -6,7 +6,8 @@ TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_techni
 [ESP32
 TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)).
 It is completely independent from the ESP-IDF and does not use any ESP-IDF
-tools or files. It implements its own flashing utility `esputil` (see below),
+tools or files. It implements its own flashing utility `esputil`
+([see below](#esputil)),
 written in C, with no dependencies on python or anything else, working on
 Mac, Linux, and Windows.
 
@@ -109,10 +110,10 @@ you have more information on that.
 # esputil
 
 `esputil` is a command line tool for managing Espressif devices. It is a
-replacement of `esptool.py`. `esputil` is written in C, its source code
-is in [tools/esputil.c](tools/esputil.c). It works on Linux, UNIX and Windows.
-A pre-compiled Windows executable can be downloaded from
-the [tools](tools) folder. Below is a quick reference:
+replacement of `esptool.py`. `esputil` is written in C, its source code is in
+[tools/esputil.c](tools/esputil.c). It works on Linux, UNIX and Windows.  A
+pre-compiled Windows executable [esputil.exe](tools/esputil.exe) can be
+downloaded from the [tools](tools) folder. Below is a quick reference:
 
 ```sh
 $ esputil -h
