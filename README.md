@@ -76,11 +76,11 @@ include $(MDK)/$(ARCH)/build.mk
 
 # API reference
 
-Currently, a limited API is implemented. The plan is to implement WiFi
+Currently, a limited API is implemented. The plan is to implement WiFi/BLE
 primitives in order to integrate [cesanta/mongoose](https://github.com/cesanta/mongoose)
 networking library. Unfortunately radio registers are not documented
-by Espressif. Please [contact us](https://mongoose.ws/contact/) if
-you have more information available on WiFi/BLE registers.
+by Espressif - please [contact us](https://mongoose.ws/contact/) if
+you have more information on that.
 
 - GPIO
   - `void gpio_output(int pin);` - set pin mode to OUTPUT
