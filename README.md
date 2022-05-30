@@ -18,15 +18,15 @@ for a full firmware rebuild and flash:
 Currently, "esp32c3" and "esp32" architectures are supported.
 MDK file structure is as follows:
 
-- $(ARCH)/link.ld - a linker script file. ARCH is esp32 or esp32c3
-- $(ARCH)/boot.c - a startup code 
-- $(ARCH)/mdk.h - a single header that implements MDK API
-- $(ARCH)/build.mk - a helper Makefile for building projects
+- $(ARCH)/[link.ld](esp32c3/link.ld) - a linker script file. ARCH is esp32 or esp32c3
+- $(ARCH)/[boot.c](esp32c3/boot.c) - a startup code 
+- $(ARCH)/[mdk.h](esp32c3/mdk.h) - a single header that implements MDK API
+- $(ARCH)/[build.mk](esp32c3/build.mk) - a helper Makefile for building projects
 
 
 # Environment setup
 
-1. Use Linux or MacOS. Install [Docker](https://docker.com)
+1. Use Linux or MacOS. Install Docker
 2. Execute the following shell commands (or add them to your `~/.profile`):
   ```sh
   $ export MDK=/path/to/mdk     # Points to MDK directory
@@ -43,7 +43,7 @@ $ make -C examples/blinky clean build flash monitor
 
 # Firmware Makefile
 
-Firmware Makefile should look like this:
+Firmware Makefile should look like this (see [examples/blinky/Makefile](examples/blinky/Makefile)):
 
 ```make
 SOURCES = main.c another_file.c
@@ -87,7 +87,7 @@ include $(MDK)/$(ARCH)/build.mk
   - `bool spi_init(struct spi *spi);` - initialise SPI
   - `void spi_begin(struct spi *spi, int cs);` - start SPI transaction
   - `void spi_end(struct spi *spi, int cs);` - end SPI transaction
-  - `uin8_t spi_txn(struct spi *spi, uint8_t);` - perform SPI transaction: write one byte and read the response
+  - `uin8_t spi_txn(struct spi *spi, uint8_t);` - do SPI transaction: write one byte, read response
 - UART 
   - `void uart_init(int no, int tx, int rx, int baud);` - initialise UART
   - `bool uart_read(int no, uint8_t *c);` - read byte. Return true on success
