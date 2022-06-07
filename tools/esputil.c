@@ -25,6 +25,7 @@
 #include <io.h>
 #include <windows.h>
 #include <winsock2.h>
+#define strcasecmp(x, y) _stricmp((x), (y))
 #define mkdir(x, y) _mkdir(x)
 #if defined(_MSC_VER) && _MSC_VER < 1700
 #define snprintf _snprintf
@@ -154,11 +155,11 @@ static void usage(struct ctx *ctx) {
   printf("Defaults: BAUD=%s, PORT=%s\n", ctx->baud, ctx->port);
   printf("Usage:\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] info\n");
+  printf("  esputil [-v] [-b BAUD] [-p PORT] [-udp PORT] monitor\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] readmem ADDR SIZE\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] readflash ADDR SIZE\n");
   printf("  esputil [-v] [-b BAUD] [-p PORT] [-fp FLASH_PARAMS] ");
-  printf("  esputil [-v] [-b BAUD] [-p PORT] [-udp PORT] monitor\n");
-  printf("[-fspi FLASH_SPI] flash OFFSET BINFILE ...\n");
+  printf("[-fspi FLASH_SPI] flash <OFFSET1 FILE1.bin ... | FILE.hex>\n");
   printf("  esputil [-v] mkbin FIRMWARE.ELF FIRMWARE.BIN\n");
   printf("  esputil mkhex ADDRESS1 BINFILE1 ADDRESS2 BINFILE2 ...\n");
   printf("  esputil [-tmp TMP_DIR] unhex HEXFILE\n");
@@ -562,6 +563,164 @@ static void readflash(struct ctx *ctx, const char **args) {
   }
 }
 
+static inline unsigned long hex_to_ul(const char *s, int len) {
+  unsigned long i = 0, v = 0;
+  for (i = 0; i < (unsigned long) len; i++) {
+    int c = s[i];
+    if (i > 0) v <<= 4;
+    v |= (c >= '0' && c <= '9')   ? c - '0'
+         : (c >= 'A' && c <= 'F') ? c - '7'
+                                  : c - 'W';
+  }
+  return v;
+}
+
+static int rmrf(const char *dirname) {
+#ifdef _WIN32
+  return !RemoveDirectory(dirname);
+#else
+  DIR *dp = opendir(dirname);
+  if (dp != NULL) {
+    struct dirent *de;
+    while ((de = readdir(dp)) != NULL) {
+      char path[PATH_MAX * 2];
+      if (de->d_name[0] == '.') continue;
+      snprintf(path, sizeof(path), "%s/%s", dirname, de->d_name);
+      remove(path);
+    }
+    closedir(dp);
+  }
+  return access(dirname, 0) == 0 ? rmdir(dirname) : EXIT_SUCCESS;
+#endif
+}
+
+// Unpack hex file into a given directory, as a collection of OFFSET.bin files
+// If buf is not null, append all created file names to it.
+static int unhex(const char *hexfile, const char *dir, char *buf, size_t bl) {
+  char tmp[600];
+  int c, n = 0, line = 0;
+  FILE *in = fopen(hexfile, "rb"), *out = NULL;
+  unsigned long upper = 0, next = 0;
+  if (in == NULL) return fail("ERROR: cannot open %s\n", hexfile);
+  if (rmrf(dir) != 0) return fail("Cannot delete dir %s\n", dir);
+  mkdir(dir, 0755);
+  buf[0] = '\0';
+  while ((c = fgetc(in)) != EOF) {
+    if (!isspace(c)) tmp[n++] = c;
+    if (n >= (int) sizeof(tmp) || c == '\n') {
+      int i, len = hex_to_ul(tmp + 1, 2);
+      unsigned long lower = hex_to_ul(tmp + 3, 4);
+      int type = hex_to_ul(tmp + 7, 2);
+      unsigned long addr = upper | lower;
+      if (tmp[0] != ':') return fail("line %d: no colon\n", line);
+      if (n != 1 + 2 + 4 + 2 + len * 2 + 2)
+        return fail("line %d: len %d, expected %d\n", n,
+                    1 + 2 + 4 + 2 + len * 2 + 2);
+      if (type == 0) {
+        if (out == NULL || next != addr) {
+          char path[200];
+          snprintf(path, sizeof(path), "%s/%#lx.bin", dir, addr);
+          if (out != NULL) fclose(out);
+          out = fopen(path, "wb");
+          if (out == NULL) return fail("Cannot open %s", path);
+          // Append created filename to the list of created files
+          snprintf(buf + strlen(buf), bl - strlen(buf), "%s%s",
+                   buf[0] == '\0' ? "" : " ", path);
+        }
+        for (i = 0; i < len; i++) {
+          int byte = hex_to_ul(tmp + 9 + i * 2, 2);
+          fputc(byte, out);
+        }
+        next = addr + len;
+      } else if (type == 1) {
+        if (out != NULL) fclose(out);
+        out = NULL;
+      } else if (type == 4) {
+        upper = hex_to_ul(tmp + 9, 4) << 16;
+      }
+      n = 0;
+    }
+  }
+  fclose(in);
+  if (out != NULL) fclose(out);
+  return EXIT_SUCCESS;
+}
+
+static int has_suffix(const char *word, const char *suffix) {
+  size_t word_len = strlen(word), suffix_len = strlen(suffix);
+  return word_len > suffix_len &&
+         strcasecmp(&word[word_len - suffix_len], suffix) == 0;
+}
+
+static void flashbin(struct ctx *ctx, uint16_t flash_params,
+                     uint32_t flash_offset, const char *path) {
+  FILE *fp = fopen(path, "rb");
+  int i, n, size, seq = 0;
+  uint32_t block_size = 4096, hs = 16, encrypted = 0, cs, tmp;
+  uint8_t buf[16 + 4096];  // First 16 bytes are for serial cmd
+
+  if (fp == NULL) fail("Cannot open %s: %s\n", path, strerror(errno));
+  fseek(fp, 0, SEEK_END);
+  size = ftell(fp);
+  rewind(fp);
+
+  memset(buf, 0, hs);  // Clear them
+
+  printf("Erasing %d bytes @ %#x", size, flash_offset);
+  fflush(stdout);
+
+  {
+    uint32_t num_blocks = (size + block_size - 1) / block_size;
+    uint32_t d1[] = {size, num_blocks, block_size, flash_offset, encrypted};
+    uint16_t d1size = sizeof(d1) - 4;
+    // Flash begin. S2, S3, C3 chips have an extra 5th parameter.
+    if (ctx->chip.id == CHIP_ID_ESP32_S2 ||
+        ctx->chip.id == CHIP_ID_ESP32_S3_BETA2 ||
+        ctx->chip.id == CHIP_ID_ESP32_S3_BETA3 ||
+        ctx->chip.id == CHIP_ID_ESP32_C6_BETA ||
+        ctx->chip.id == CHIP_ID_ESP32_C3_ECO_1_2 ||
+        ctx->chip.id == CHIP_ID_ESP32_C3_ECO3)
+      d1size += 4;
+    if (cmd(ctx, 2, d1, d1size, 0, 15000)) fail("\nerase failed\n");
+  }
+
+  // Read from file into a buffer, but skip initial 16 bytes
+  while ((n = fread(buf + hs, 1, block_size, fp)) > 0) {
+    int oft = ftell(fp);
+    for (i = 0; i < 100; i++) putchar('\b');
+    printf("Writing %s, %d/%d bytes @ 0x%x (%d%%)", path, n, size,
+           flash_offset + oft - n, oft * 100 / size);
+    fflush(stdout);
+
+    // Embed flash params into an image
+    if (seq == 0) {
+      if (flash_offset == ctx->chip.bla && flash_params != 0) {
+        buf[hs + 2] = (uint8_t) ((flash_params >> 8) & 255);
+        buf[hs + 3] = (uint8_t) (flash_params & 255);
+      }
+      // Set chip type in the extended header at offset 4.
+      // Common header is 8, plus extended header offset 4 = 12
+      if (ctx->chip.id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 12] = 5;
+      if (ctx->chip.id == CHIP_ID_ESP32_C3_ECO_1_2) buf[hs + 12] = 5;
+    }
+
+    // Align buffer to block_size and pad with 0xff
+    // memset(buf + hs + n, 255, sizeof(buf) - hs - n);
+    // n = ALIGN(n, block_size);
+
+    // Flash write
+    tmp = n, memcpy(&buf[0], &tmp, 4);      // Set buffer size
+    tmp = seq++, memcpy(&buf[4], &tmp, 4);  // Set sequence number
+    cs = checksum(buf + hs, n);
+    if (cmd(ctx, 3, buf, (uint16_t) (hs + n), cs, 1500))
+      fail("flash_data failed\n");
+  }
+
+  for (i = 0; i < 100; i++) printf("\b \b");
+  printf("Written %s, %d bytes @ %#x\n", path, size, flash_offset);
+  fclose(fp);
+}
+
 static void flash(struct ctx *ctx, const char **args) {
   uint16_t flash_params = 0;
   if (!chip_connect(ctx)) fail("Error connecting\n");
@@ -592,74 +751,27 @@ static void flash(struct ctx *ctx, const char **args) {
   printf("Using flash params %#hx\n", flash_params);
 
   // Iterate over arguments: FLASH_OFFSET FILENAME ...
-  while (args[0] && args[1]) {
-    FILE *fp = fopen(args[1], "rb");
-    int i, n, size, seq = 0;
-    uint32_t block_size = 4096, hs = 16, encrypted = 0, cs, tmp;
-    uint32_t flash_offset = strtoul(args[0], NULL, 0);
-    uint8_t buf[16 + 4096];  // First 16 bytes are for serial cmd
-
-    if (fp == NULL) fail("Cannot open %s: %s\n", args[1], strerror(errno));
-    fseek(fp, 0, SEEK_END);
-    size = ftell(fp);
-    rewind(fp);
-
-    memset(buf, 0, hs);  // Clear them
-
-    printf("Erasing %d bytes @ %#x", size, flash_offset);
-    fflush(stdout);
-
-    {
-      uint32_t num_blocks = (size + block_size - 1) / block_size;
-      uint32_t d1[] = {size, num_blocks, block_size, flash_offset, encrypted};
-      uint16_t d1size = sizeof(d1) - 4;
-      // Flash begin. S2, S3, C3 chips have an extra 5th parameter.
-      if (ctx->chip.id == CHIP_ID_ESP32_S2 ||
-          ctx->chip.id == CHIP_ID_ESP32_S3_BETA2 ||
-          ctx->chip.id == CHIP_ID_ESP32_S3_BETA3 ||
-          ctx->chip.id == CHIP_ID_ESP32_C6_BETA ||
-          ctx->chip.id == CHIP_ID_ESP32_C3_ECO_1_2 ||
-          ctx->chip.id == CHIP_ID_ESP32_C3_ECO3)
-        d1size += 4;
-      if (cmd(ctx, 2, d1, d1size, 0, 15000)) fail("\nerase failed\n");
-    }
-
-    // Read from file into a buffer, but skip initial 16 bytes
-    while ((n = fread(buf + hs, 1, block_size, fp)) > 0) {
-      int oft = ftell(fp);
-      for (i = 0; i < 100; i++) putchar('\b');
-      printf("Writing %s, %d/%d bytes @ 0x%x (%d%%)", args[1], n, size,
-             flash_offset + oft - n, oft * 100 / size);
-      fflush(stdout);
-
-      // Embed flash params into an image
-      if (seq == 0) {
-        if (flash_offset == ctx->chip.bla && flash_params != 0) {
-          buf[hs + 2] = (uint8_t) ((flash_params >> 8) & 255);
-          buf[hs + 3] = (uint8_t) (flash_params & 255);
-        }
-        // Set chip type in the extended header at offset 4.
-        // Common header is 8, plus extended header offset 4 = 12
-        if (ctx->chip.id == CHIP_ID_ESP32_C3_ECO3) buf[hs + 12] = 5;
-        if (ctx->chip.id == CHIP_ID_ESP32_C3_ECO_1_2) buf[hs + 12] = 5;
+  while (args[0]) {
+    if (has_suffix(args[0], ".hex")) {
+      // A .hex file is fed to us. Unhex it first into a temp dir
+      char file_list[8192], tmpdir[1024], *s = file_list;
+      size_t n;
+      snprintf(tmpdir, sizeof(tmpdir), "%s.tmp", args[0]);
+      unhex(args[0], tmpdir, file_list, sizeof(file_list));
+      // Now iterate over the unhexed files, and flash each
+      while ((n = strcspn(s, " ")) > 0) {
+        char *slash, *p = s + n;
+        while (*p == ' ') *p++ = '\0';
+        slash = strchr(s, '/');
+        flashbin(ctx, flash_params, strtoul(slash ? slash + 1 : s, NULL, 0), s);
+        s = p;
       }
-
-      // Align buffer to block_size and pad with 0xff
-      // memset(buf + hs + n, 255, sizeof(buf) - hs - n);
-      // n = ALIGN(n, block_size);
-
-      // Flash write
-      tmp = n, memcpy(&buf[0], &tmp, 4);      // Set buffer size
-      tmp = seq++, memcpy(&buf[4], &tmp, 4);  // Set sequence number
-      cs = checksum(buf + hs, n);
-      if (cmd(ctx, 3, buf, (uint16_t) (hs + n), cs, 1500))
-        fail("flash_data failed\n");
+      rmrf(tmpdir);  // Cleanup temp dir
+      args += 1;     // Move to next file
+    } else if (args[1] != NULL) {
+      flashbin(ctx, flash_params, strtoul(args[0], NULL, 0), args[1]);
+      args += 2;
     }
-
-    for (i = 0; i < 100; i++) printf("\b \b");
-    printf("Written %s, %d bytes @ %#x\n", args[1], size, flash_offset);
-    fclose(fp);
-    args += 2;
   }
 
   {
@@ -808,83 +920,6 @@ static int mkhex(const char **args) {
   return EXIT_SUCCESS;
 }
 
-static inline unsigned long hex_to_ul(const char *s, int len) {
-  unsigned long i = 0, v = 0;
-  for (i = 0; i < (unsigned long) len; i++) {
-    int c = s[i];
-    if (i > 0) v <<= 4;
-    v |= (c >= '0' && c <= '9')   ? c - '0'
-         : (c >= 'A' && c <= 'F') ? c - '7'
-                                  : c - 'W';
-  }
-  return v;
-}
-
-static int rmrf(const char *dirname) {
-#ifdef _WIN32
-  return !RemoveDirectory(dirname);
-#else
-  DIR *dp = opendir(dirname);
-  if (dp != NULL) {
-    struct dirent *de;
-    while ((de = readdir(dp)) != NULL) {
-      char path[PATH_MAX * 2];
-      if (de->d_name[0] == '.') continue;
-      snprintf(path, sizeof(path), "%s/%s", dirname, de->d_name);
-      remove(path);
-    }
-    closedir(dp);
-  }
-  return access(dirname, 0) == 0 ? rmdir(dirname) : EXIT_SUCCESS;
-#endif
-}
-
-static int unhex(const char *hexfile, const char *dir) {
-  char buf[600];
-  int c, n = 0, line = 0;
-  FILE *in = fopen(hexfile, "rb"), *out = NULL;
-  unsigned long upper = 0, next = 0;
-  if (in == NULL) return fail("ERROR: cannot open %s\n", hexfile);
-  if (rmrf(dir) != 0) return fail("Cannot delete dir %s\n", dir);
-  mkdir(dir, 0755);
-  while ((c = fgetc(in)) != EOF) {
-    if (!isspace(c)) buf[n++] = c;
-    if (n >= (int) sizeof(buf) || c == '\n') {
-      int i, len = hex_to_ul(buf + 1, 2);
-      unsigned long lower = hex_to_ul(buf + 3, 4);
-      int type = hex_to_ul(buf + 7, 2);
-      unsigned long addr = upper | lower;
-      if (buf[0] != ':') return fail("line %d: no colon\n", line);
-      if (n != 1 + 2 + 4 + 2 + len * 2 + 2)
-        return fail("line %d: len %d, expected %d\n", n,
-                    1 + 2 + 4 + 2 + len * 2 + 2);
-      if (type == 0) {
-        if (out == NULL || next != addr) {
-          char path[40];
-          snprintf(path, sizeof(path), "%s/%#lx.bin", dir, addr);
-          if (out != NULL) fclose(out);
-          out = fopen(path, "wb");
-          if (out == NULL) return fail("Cannot open %s", path);
-        }
-        for (i = 0; i < len; i++) {
-          int byte = hex_to_ul(buf + 9 + i * 2, 2);
-          fputc(byte, out);
-        }
-        next = addr + len;
-      } else if (type == 1) {
-        if (out != NULL) fclose(out);
-        out = NULL;
-      } else if (type == 4) {
-        upper = hex_to_ul(buf + 9, 4) << 16;
-      }
-      n = 0;
-    }
-  }
-  fclose(in);
-  if (out != NULL) fclose(out);
-  return EXIT_SUCCESS;
-}
-
 static int open_udp_socket(const char *portspec) {
   int sock;
   struct sockaddr_in sin;
@@ -958,7 +993,8 @@ int main(int argc, const char **argv) {
   } else if (strcmp(*command, "mkhex") == 0) {
     return mkhex(&command[1]);
   } else if (strcmp(*command, "unhex") == 0) {
-    return unhex(command[1], temp_dir);
+    char file_list[500];
+    return unhex(command[1], temp_dir, file_list, sizeof(file_list));
   }
 
   // Commands that require serial port. First, open serial.
