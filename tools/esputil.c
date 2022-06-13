@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #ifdef _WIN32
 // Windows includes
@@ -577,20 +578,39 @@ static inline unsigned long hex_to_ul(const char *s, int len) {
 
 static int rmrf(const char *dirname) {
 #ifdef _WIN32
-  return !RemoveDirectory(dirname);
+  char tmp[MAX_PATH], path[MAX_PATH];
+  WIN32_FIND_DATA data;
+  HANDLE hFind;
+  snprintf(tmp, sizeof(tmp), "%s\\*", dirname);
+  hFind = FindFirstFile(tmp, &data);
+  if (hFind != INVALID_HANDLE_VALUE) {
+    do {
+      struct _stat st;
+      snprintf(path, sizeof(path), "%s/%s", dirname, data.cFileName);
+      if (data.cFileName[0] == '.') continue;
+      if (_stat(path, &st) == 0 && (st.st_mode & S_IFDIR)) rmrf(path);
+      remove(path);
+    } while (FindNextFile(hFind, &data));
+    FindClose(hFind);
+  }
+  RemoveDirectory(dirname);
+  return _access(dirname, 0) != 0;
 #else
   DIR *dp = opendir(dirname);
   if (dp != NULL) {
     struct dirent *de;
     while ((de = readdir(dp)) != NULL) {
-      char path[PATH_MAX * 2];
+      struct stat st;
+      char path[PATH_MAX];
       if (de->d_name[0] == '.') continue;
       snprintf(path, sizeof(path), "%s/%s", dirname, de->d_name);
+      if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) rmrf(path);
       remove(path);
     }
     closedir(dp);
   }
-  return access(dirname, 0) == 0 ? rmdir(dirname) : EXIT_SUCCESS;
+  (void) rmdir(dirname);
+  return access(dirname, 0) != 0;
 #endif
 }
 
@@ -602,7 +622,7 @@ static int unhex(const char *hexfile, const char *dir, char *buf, size_t bl) {
   FILE *in = fopen(hexfile, "rb"), *out = NULL;
   unsigned long upper = 0, next = 0;
   if (in == NULL) return fail("ERROR: cannot open %s\n", hexfile);
-  if (rmrf(dir) != 0) return fail("Cannot delete dir %s\n", dir);
+  if (rmrf(dir) == 0) return fail("Cannot delete dir %s\n", dir);
   mkdir(dir, 0755);
   buf[0] = '\0';
   while ((c = fgetc(in)) != EOF) {
