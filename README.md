@@ -213,12 +213,12 @@ The image should be of the following format:
 Image header format includes two bytes, `F1` and `F2`, which desribe
 SPI flash parameters that ROM bootloader uses to load the rest of the firmware.
 
-- Flash mode. F1 byte. Can be `0` - qio, `1` - qout, `2` - dio, `3` - dout
-- FLash size. High 4 bits of F2 byte. For ESP32: `0` - 1m, `1` - 2m, `2` -
-  4m, `3` - 8m, `4` - 16m. For ESP8266: `0` - 512k, `1` - 256k, `2` - 1m, `3`
-  - 2m, `4` - 4m, `8` - 8m, `9` - 16m
-- Flash frequency. Low 4 bits of F2 byte. Can be `0` - 40m, `1` - 26m, `2` -
-  20m, `f` - 80m
+- Flash mode. F1 byte, `0`: qio, `1`: qout, `2`: dio, `3`: dout
+- FLash size. High 4 bits of F2 byte,
+   - for ESP32: `0`: 1m, `1`: 2m, `2`: 4m, `3`: 8m, `4`: 16m
+   - for ESP8266: `0`: 512k, `1`: 256k, `2`: 1m, `3`: 2m, `4`: 4m, `8`: 8m, `9`: 16m
+- Flash frequency. Low 4 bits of F2 byte, `0`: 40m, `1`: 26m, `2`:
+  20m, `f`: 80m
 
 By default, `esputil` fetches flash params `F1` and `F2` from the existing
 bootloader by reading first 4 bytes of the bootloader from flash.  It is
