@@ -782,7 +782,7 @@ static void flash(struct ctx *ctx, const char **args) {
       while ((n = strcspn(s, " ")) > 0) {
         char *slash, *p = s + n;
         while (*p == ' ') *p++ = '\0';
-        slash = strchr(s, '/');
+        slash = strrchr(s, '/');
         flashbin(ctx, flash_params, strtoul(slash ? slash + 1 : s, NULL, 0), s);
         s = p;
       }
