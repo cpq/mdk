@@ -7,7 +7,7 @@ TRM](https://www.espressif.com/sites/default/files/documentation/esp32-c3_techni
 TRM](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)).
 It is completely independent from the ESP-IDF and does not use any ESP-IDF
 tools or files. MDK implements its own flashing utility `esputil`, which is
-developed in a separate repo https://github.com/esputil. Esputil is
+developed in a separate repo. Esputil is
 written in C, with no dependencies on python or anything else, working on
 Mac, Linux, and Windows as a static, singe no-dependencies executable.
 
