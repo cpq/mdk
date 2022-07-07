@@ -1,7 +1,7 @@
 PROG        ?= firmware
 ARCH        ?= esp32
 MDK         ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
-ESPUTIL     ?= $(MDK)/tools/esputil
+ESPUTIL     ?= $(MDK)/esputil/esputil
 CFLAGS      ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -pedantic \
                -Wdouble-promotion -fno-common -Wconversion \
                -mlongcalls -mtext-section-literals \
@@ -29,8 +29,11 @@ flash: $(PROG).bin $(ESPUTIL)
 monitor: $(ESPUTIL)
 	$(ESPUTIL) monitor
 
-$(ESPUTIL): $(MDK)/tools/esputil.c
-	make -C $(MDK)/tools esputil
+$(MDK)/esputil/esputil.c:
+	git submodule update --init --recursive
+
+$(ESPUTIL): $(MDK)/esputil/esputil.c
+	make -C $(MDK)/esputil esputil
 
 clean:
 	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(PROG)*
