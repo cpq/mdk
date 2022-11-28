@@ -1,4 +1,4 @@
-CFLAGS ?= -W -Wall -Wextra -Wundef -Wshadow -Wdouble-promotion -Os -static -s
+CFLAGS ?= -W -Wall -Wextra -Wundef -Wshadow -Wdouble-promotion -O2
 BINDIR ?= .
 CWD ?= $(realpath $(CURDIR))
 DOCKER = docker run $(DA) --rm -e Tmp=. -e WINEDEBUG=-all -v $(CWD):$(CWD) -w $(CWD)

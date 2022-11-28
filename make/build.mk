@@ -1,7 +1,8 @@
 MDK      ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 PROG     ?= firmware
 ARCH     ?= ESP32C3
-COMPILER ?= $(MDK)/tools/riscv32-tcc
+CDIR     ?= $(realpath $(MDK)/../tcc-riscv32)
+COMPILER ?= $(CDIR)/tcc
 ESPUTIL  ?= $(MDK)/tools/esputil
 BLOFFSET ?= 0
 
@@ -44,7 +45,9 @@ $(ESPUTIL):
 	$(MAKE) -C $(MDK)/tools esputil
 
 $(COMPILER):
-	$(MAKE) -C $(MDK)/tools tcc
+	cc $(CDIR)/tcc.c -DTCC_RISCV_ilp32 -DTCC_TARGET_RISCV32 \
+    -DTCC_VERSION=\""SamE\"" -O2 -w -o $@
+#	$(MAKE) -C `dirname $(COMPILER)` tcc
 
 clean:
 	@rm -rf *.{bin,elf,map,lst,tgz,zip,hex} $(PROG) $(PROG).*
